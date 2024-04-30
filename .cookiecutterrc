@@ -1,0 +1,61 @@
+# This file exists so you can easily regenerate your project.
+#
+# `cookiepatcher` is a convenient shim around `cookiecutter`
+# for regenerating projects (it will generate a .cookiecutterrc
+# automatically for any template). To use it:
+#
+#    pip install cookiepatcher
+#    cookiepatcher gh:ionelmc/cookiecutter-pylibrary databasetools
+#
+# See:
+#    https://pypi.org/project/cookiepatcher
+#
+# Alternatively, you can run:
+#
+#    cookiecutter --overwrite-if-exists --config-file=databasetools/.cookiecutterrc gh:ionelmc/cookiecutter-pylibrary
+
+default_context:
+    c_extension_optional: "no"
+    c_extension_support: "no"
+    codacy: "no"
+    codacy_projectid: "[Get ID from https://app.codacy.com/gh/cosgroma/databasetools/settings]"
+    codeclimate: "no"
+    codecov: "yes"
+    command_line_interface: "click"
+    command_line_interface_bin_name: "dbman"
+    coveralls: "no"
+    distribution_name: "databasetools"
+    email: "cosgroma@gmail.com"
+    formatter_quote_style: "double"
+    full_name: "Mathew Cosgrove"
+    function_name: "compute"
+    github_actions: "yes"
+    github_actions_osx: "no"
+    github_actions_windows: "yes"
+    license: "GNU Lesser General Public License v3 or later (LGPLv3+)"
+    module_name: "core"
+    package_name: "databasetools"
+    pre_commit: "yes"
+    project_name: "DatabaseTools"
+    project_short_description: "Document Database tools and helpers."
+    pypi_badge: "yes"
+    pypi_disable_upload: "no"
+    release_date: "today"
+    repo_hosting: "github.com"
+    repo_hosting_domain: "github.com"
+    repo_main_branch: "main"
+    repo_name: "databasetools"
+    repo_username: "cosgroma"
+    scrutinizer: "no"
+    setup_py_uses_setuptools_scm: "no"
+    sphinx_docs: "no"
+    sphinx_docs_hosting: "https://databasetools.readthedocs.io/"
+    sphinx_doctest: "no"
+    sphinx_theme: "furo"
+    test_matrix_separate_coverage: "no"
+    tests_inside_package: "no"
+    version: "0.0.0"
+    version_manager: "bump2version"
+    website: "https://cosgroma.work"
+    year_from: "2024"
+    year_to: "2024"
