@@ -22,7 +22,7 @@ setup(
     ),
     author="Mathew Cosgrove",
     author_email="cosgroma@gmail.com",
-    url="https://github.com/cosgroma/databasetools",
+    url="https://github.com/cosgroma/database-tools",
     packages=find_packages("src"),
     package_dir={"": "src"},
     py_modules=[path.stem for path in Path("src").glob("*.py")],
@@ -52,8 +52,8 @@ setup(
         "Topic :: Utilities",
     ],
     project_urls={
-        "Changelog": "https://github.com/cosgroma/databasetools/blob/master/CHANGELOG.rst",
-        "Issue Tracker": "https://github.com/cosgroma/databasetools/issues",
+        "Changelog": "https://github.com/cosgroma/database-tools/blob/master/CHANGELOG.rst",
+        "Issue Tracker": "https://github.com/cosgroma/database-tools/issues",
     },
     keywords=[
         # eg: "keyword1", "keyword2", "keyword3",
