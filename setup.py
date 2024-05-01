@@ -61,6 +61,7 @@ setup(
     python_requires=">=3.8",
     install_requires=[
         "click",
+        "notion_client",
         # eg: "aspectlib==1.1.1", "six>=1.7",
     ],
     extras_require={
