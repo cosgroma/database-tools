@@ -2,13 +2,14 @@
 # path = exporter.export_url(url=url)
 # print(f" * Exported to {path}")
 
+import os
+
 from databasetools import notion_exporter
 
-NOTION_API_KEY = "secret_9TbvSMWaQM1lMEGX743sm8qOFx9GBLeflfKHgi7S1IP"
-TEST_DATABASE_ID = "62c81d1feaaf485288b4758ec7516b89"
-PAGE_URL = "https://www.notion.so/cosgroma/Integration-Test-Area-44a057c1ee38483b8d88c9a5e6d3dce2?pvs=4"
-DATABASE_URL = "https://www.notion.so/cosgroma/62c81d1feaaf485288b4758ec7516b89?v=380a231034534e04b678fd0c80d4ccf9&pvs=4"
-PAGE_ID = "44a057c1ee38483b8d88c9a5e6d3dce2"
+NOTION_API_KEY = os.getenv("NOTION_API_KEY")
+PAGE_URL = os.getenv("PAGE_URL")
+TEST_DATABASE_ID = os.getenv("TEST_DATABASE_ID")
+PAGE_ID = os.getenv("PAGE_ID")
 
 
 def test_exporter():
@@ -19,3 +20,14 @@ def test_exporter():
     assert path.exists()
     path = exporter.export_page(page_id=PAGE_ID)
     assert path.exists()
+
+
+def test_recent_pages():
+    exporter = notion_exporter.NotionExporter(token=NOTION_API_KEY)
+    pages = exporter.downloader.get_recent_pages()
+    assert len(pages) > 0
+
+
+if __name__ == "__main__":
+    test_recent_pages()
+    print(" * All tests passed!")

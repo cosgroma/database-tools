@@ -45,10 +45,6 @@ setup(
         "Programming Language :: Python :: 3.12",
         "Programming Language :: Python :: Implementation :: CPython",
         "Programming Language :: Python :: Implementation :: PyPy",
-        # uncomment if you test on these interpreters:
-        # "Programming Language :: Python :: Implementation :: IronPython",
-        # "Programming Language :: Python :: Implementation :: Jython",
-        # "Programming Language :: Python :: Implementation :: Stackless",
         "Topic :: Utilities",
     ],
     project_urls={
@@ -58,11 +54,15 @@ setup(
     keywords=[
         # eg: "keyword1", "keyword2", "keyword3",
     ],
-    python_requires=">=3.8",
+    python_requires=">=3.11",
     install_requires=[
         "click",
-        "notion_client",
-        # eg: "aspectlib==1.1.1", "six>=1.7",
+        "python-dateutil==2.9.0.post0",
+        "python-dotenv==1.0.1",
+        "notion-client==2.2.1",
+        "notion-database==1.2.0",
+        "notion-df==0.0.5",
+        "notion-objects==0.6.2",
     ],
     extras_require={
         # eg:

@@ -65,7 +65,7 @@ class JsonToMdConverter:
         with Path.open(json_dir / "database.json") as f:
             page_id_to_metadata = {page["id"]: self.get_post_metadata(page) for page in json.load(f)}
 
-        paths = [path for path in Path.glob(str(json_dir / "*.json")) if Path(path).name != "database.json"]
+        paths = [path for path in Path.glob(json_dir, "*.json") if Path(path).name != "database.json"]
         for path in paths:
             with Path.open(path) as f:
                 blocks = json.load(f)

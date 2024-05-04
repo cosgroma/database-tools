@@ -1,13 +1,16 @@
 import json
 from datetime import datetime
-from itertools import chain
 from pathlib import Path
+from typing import Any
+from typing import Dict
 from typing import List
 from typing import Optional
 from typing import Union
 
 from notion_client import Client
 from notion_client.helpers import iterate_paginated_api as paginate
+from notion_objects import Database
+from notion_objects import Page
 
 from .utils import logger
 from .utils import normalize_id
@@ -93,15 +96,56 @@ class NotionClient:
         self.client = Client(auth=token)
         self.transformer = transformer
         self.filter = filter
+        self.database_records = {}
+        # with open("~/database_records.json", "r") as f:
+        #     self.database_records = json.load(f)
 
     def get_metadata(self, page_id: str) -> dict:
         """Get page metadata as json."""
         return self.transformer.forward([self.client.pages.retrieve(page_id=page_id)])[0]
 
+    def get_recent_pages(self) -> List[Dict[str, Any]]:
+        """Get Recent Pages via Search Query.
+
+        Returns:
+            List[Dict[str, Any]]: List of Recent Pages
+        """
+        payload = {
+            "filter": {
+                "value": "page",
+                "property": "object",
+            },
+            "sort": {
+                "direction": "descending",
+                "timestamp": "last_edited_time",
+            },
+        }
+        return self.client.search(**payload).get("results")
+
+    def get_recent_projects(self) -> List[Dict[str, Any]]:
+        """Get Recent Projects via Search Query.
+
+        Returns:
+            List[Dict[str, Any]]: List of Recent Projects
+        """
+        payload = {
+            "query": "project",
+            "filter": {
+                "value": "page",
+                "property": "object",
+            },
+            "sort": {
+                "direction": "descending",
+                "timestamp": "last_edited_time",
+            },
+        }
+        return self.client.search(**payload).get("results")
+
     def get_blocks(self, block_id: int) -> List:
         """Get all page blocks as json. Recursively fetches descendants."""
         blocks = []
-        for child in chain(*paginate(self.client.blocks.children.list, block_id=block_id)):
+        results = paginate(self.client.blocks.children.list, block_id=block_id)
+        for child in results:
             child["children"] = list(self.get_blocks(child["id"])) if child["has_children"] else []
             blocks.append(child)
         return list(self.transformer.forward(blocks))
@@ -119,4 +163,56 @@ class NotionClient:
                 self.client.databases.query,
                 database_id=database_id,
             )
-        return list(self.transformer.forward(chain(*results)))
+        pages = [self.client.pages.retrieve(page_id=pg["id"]) for pg in results]
+        return list(self.transformer.forward(pages))
+
+
+# class NotionDatabase:
+#     def __init__(self, token: str):
+#         self.client = Client(auth=token)
+
+#     def get_databases(self) -> List[Database]:
+#         """Get all databases."""
+#         return [Database.from_dict(db) for db in self.client.databases.list()]
+
+#     def get_database(self, database_id: str) -> Database:
+#         """Get a database."""
+#         return Database.from_dict(self.client.databases.retrieve(database_id=database_id))
+
+#     def get_pages(self, database_id: str) -> List[Page]:
+#         """Get all pages in a database."""
+#         return [Page.from_dict(pg) for pg in self.client.databases.query(database_id=database_id).get("results")]
+
+#     def get_page(self, page_id: str) -> Page:
+#         """Get a page."""
+#         return Page.from_dict(self.client.pages.retrieve(page_id=page_id))
+
+
+class NotionPage:
+    def __init__(self, token: str, page_id: str):
+        self.client = Client(auth=token)
+        self.page_id = page_id
+        self.page = self.client.pages.retrieve(page_id=page_id)
+
+    def get_page(self) -> Page:
+        """Get a page."""
+        return Page.from_dict(self.page)
+
+    def get_blocks(self) -> List[dict]:
+        """Get all blocks in a page."""
+        return self.client.blocks.children.list(block_id=self.page_id).get("results")
+
+    def set_blocks(self, blocks: List[dict], clear: bool = False):
+        """Set all blocks in a page."""
+        if clear:
+            self.client.blocks.children.append(block_id=self.page_id, children=blocks)
+        else:
+            self.client.blocks.children.update(block_id=self.page_id, children=blocks)
+
+    def add_page(self, page: Page):
+        """Add a page to the current page."""
+        self.client.blocks.children.append(block_id=self.page_id, children=[page.to_dict()])
+
+    def add_database(self, database: Database):
+        """Add a database to the current page."""
+        self.client.databases.create(parent={"page_id": self.page_id}, database=database.to_dict())
