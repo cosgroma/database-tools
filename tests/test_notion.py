@@ -46,13 +46,15 @@ def test_client():
     assert isinstance(database, list)
 
 
+exporter = NotionExporter(token=NOTION_API_KEY)
+
+
 def test_exporter_export_url():
     # Make test directory
     assert NOTION_API_KEY, "NOTION_API_KEY not set, set it in .env file"
     assert PAGE_URL, "PAGE_URL not set, set it in .env file"
     assert TEST_DATABASE_ID, "TEST_DATABASE_ID not set, set it in .env file"
 
-    exporter = NotionExporter(token=NOTION_API_KEY)
     test_page_name = "test_page_url"
     json_dir = f"{test_page_name}/json"
     md_dir = f"{test_page_name}/md"
@@ -69,8 +71,6 @@ def test_exporter_export_url():
 
 
 def test_exporter_export_page():
-    exporter = NotionExporter(token=NOTION_API_KEY)
-    # os.makedirs("test_page", exist_ok=True)
     test_page_name = "test_page"
     json_dir = f"{test_page_name}/json"
     md_dir = f"{test_page_name}/md"
@@ -80,11 +80,11 @@ def test_exporter_export_page():
     assert md_path.suffix == ".md"
     assert json_path.exists()
     assert json_path.is_dir()
-    # shutil.rmtree(test_page_name)
+    shutil.rmtree(test_page_name)
 
 
 def test_exporter_export_database():
-    exporter = NotionExporter(token=NOTION_API_KEY)
+    # exporter = NotionExporter(token=NOTION_API_KEY)
     test_db_name = "test_db"
     json_dir = f"{test_db_name}/json"
     md_dir = f"{test_db_name}/md"

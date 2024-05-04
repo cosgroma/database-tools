@@ -18,5 +18,6 @@ include CONTRIBUTING.rst
 include LICENSE
 include README.rst
 include requirements.txt
+include *.template
 
 global-exclude *.py[cod] __pycache__/* *.so *.dylib
