@@ -92,8 +92,10 @@ class NotionIO:
 
 
 class NotionClient:
-    def __init__(self, token: str, transformer, filter: Optional[dict] = None):
+    def __init__(self, token: str, transformer: LastEditedToDateTime = None, filter: Optional[dict] = None):
         self.client = Client(auth=token)
+        if transformer is None:
+            transformer = LastEditedToDateTime()
         self.transformer = transformer
         self.filter = filter
         self.database_records = {}

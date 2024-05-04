@@ -56,11 +56,16 @@ class JsonToMdConverter:
 
     def convert(self, json_dir: Union[str, Path], md_dir: Union[str, Path]):
         """Convert Notion JSON to markdown."""
-        json_dir = Path(json_dir)
-        json_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            json_dir = Path(json_dir)
+            json_dir.mkdir(parents=True, exist_ok=True)
 
-        md_dir = Path(md_dir)
-        md_dir.mkdir(parents=True, exist_ok=True)
+            md_dir = Path(md_dir)
+            md_dir.mkdir(parents=True, exist_ok=True)
+
+        except OSError as e:
+            if not json_dir.exists() and not md_dir.exists():
+                raise e
 
         with Path.open(json_dir / "database.json") as f:
             page_id_to_metadata = {page["id"]: self.get_post_metadata(page) for page in json.load(f)}

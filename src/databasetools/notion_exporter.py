@@ -23,5 +23,6 @@ class NotionExporter:
 
     def export_page(self, page_id: str, json_dir: Union[str, Path] = "./json", md_dir: Union[str, Path] = "./md"):
         """Export the notion page."""
-        self.downloader.download_page(page_id, json_dir)
+        json_dir_path = Path(json_dir)
+        self.downloader.download_page(page_id, json_dir_path / f"{page_id}.json")
         return self.converter.convert(json_dir, md_dir)
