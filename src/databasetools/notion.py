@@ -10,6 +10,8 @@ from typing import Union
 
 from notion_client import Client
 from notion_client.helpers import iterate_paginated_api as paginate
+from notion_objects import Database
+from notion_objects import NotionObject
 from notion_objects import Page
 
 from .utils import find_title_prop
@@ -171,33 +173,13 @@ class NotionClient:
         return list(self.transformer.forward(pages))
 
 
-# class NotionDatabase:
-#     def __init__(self, token: str):
-#         self.client = Client(auth=token)
-
-#     def get_databases(self) -> List[Database]:
-#         """Get all databases."""
-#         return [Database.from_dict(db) for db in self.client.databases.list()]
-
-#     def get_database(self, database_id: str) -> Database:
-#         """Get a database."""
-#         return Database.from_dict(self.client.databases.retrieve(database_id=database_id))
-
-#     def get_pages(self, database_id: str) -> List[Page]:
-#         """Get all pages in a database."""
-#         return [Page.from_dict(pg) for pg in self.client.databases.query(database_id=database_id).get("results")]
-
-#     def get_page(self, page_id: str) -> Page:
-#         """Get a page."""
-#         return Page.from_dict(self.client.pages.retrieve(page_id=page_id))
-
-
 class NotionPage:
     def __init__(self, token: str, page_id: str, load: bool = False):
         self.token = token
         self.n_client = NotionClient(token)
         self.page_id = page_id
         self.child_pages: List["NotionPage"] = []
+        self.child_databases: List["NotionDatabase"] = []
         self.blocks: List[dict] = []
         self.page = None
         self.title = None
@@ -246,6 +228,13 @@ class NotionPage:
         )
         return NotionPage(token=self.n_client.token, page_id=page["id"], load=False)
 
+    def add_database(self, title: str) -> "NotionDatabase":
+        """Add a database to the current page."""
+        database = self.n_client.client.databases.create(
+            parent={"page_id": self.page_id}, title=[{"text": {"content": title}}], properties={"Name": {"title": {}}}
+        )
+        return NotionDatabase(token=self.n_client.token, database_id=database["id"])
+
     def get_child_pages(self, force: bool = False) -> List["NotionPage"]:
         """Get Child Pages.
 
@@ -264,22 +253,21 @@ class NotionPage:
                     self.child_pages.append(NotionPage(token=self.n_client.token, page_id=block["id"], load=False))
         return self.child_pages
 
-    # def get_child_databases(self, force: bool = False) -> List["NotionPage"]:
-    #     """Get Child Databases.
+    def get_child_databases(self, force: bool = False) -> List["NotionDatabase"]:
+        """Get Child Databases.
 
-    #     Args:
-    #         page_id (str): Page ID
+        Args:
+            force (bool, optional): Force Refresh. Defaults to False.
 
-    #     Returns:
-    #         List[dict]: List of Child Databases
-    #     """
-    #     if force or not self.child_pages:
-    #         blocks = self.get_blocks()
-
-    #         for block in blocks:
-    #             if block["type"] == "database":
-    #                 self.child_pages.append(NotionPage(token=self.n_client.token, page_id=block["id"], load=False))
-    #     return self.child_pages
+        Returns:
+            List[dict]: List of Child Databases
+        """
+        if force or not self.child_databases:
+            blocks = self.get_blocks()
+            for block in blocks:
+                if block["type"] == "database_id":
+                    self.child_databases.append(NotionDatabase(token=self.n_client.token, database_id=block["id"]))
+        return self.child_databases
 
     def delete_child_pages(self):
         """Delete Child Pages."""
@@ -293,3 +281,33 @@ class NotionPage:
 
     def __repr__(self):
         return f"NotionPage(title={self.title}, page_id={self.page_id})"
+
+
+class NotionDatabase:
+    def __init__(self, token: str, database_id: str, data_class: Optional[NotionObject] = None):
+        self.client = Client(auth=token)
+        if data_class is None:
+            self.database: Database[Page] = Database(Page, database_id=database_id, client=self.client)
+        else:
+            self.database: Database[data_class] = Database(data_class, database_id=database_id, client=self.client)
+
+        self.properties = self.database.properties
+        self.pages: List[NotionPage] = []
+        for page in self.database:
+            self.pages.append(NotionPage(token=token, page_id=page.id, load=False))
+
+    def get_pages(self, force: bool = False) -> List[NotionPage]:
+        """Get Pages."""
+        if force or not self.pages:
+            for page in self.database:
+                self.pages.append(NotionPage(token=self.client.auth, page_id=page.id, load=False))
+        return self.pages
+
+    def remove_pages(self):
+        """Remove Pages."""
+        for page in self.pages:
+            self.client.blocks.delete(block_id=page.page_id)
+            self.pages.remove(page)
+
+    def __repr__(self):
+        return f"NotionDatabase(title={self.database.title}, database_id={self.database.database_id})"

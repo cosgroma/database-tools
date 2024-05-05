@@ -9,6 +9,7 @@ from pathlib import Path
 
 import pytz
 
+import databasetools.block as NotionBlock
 from databasetools import NotionClient
 from databasetools import NotionExporter
 from databasetools import NotionPage
@@ -131,13 +132,67 @@ def test_notion_page():
     assert len(child_pages) > 0
 
     for child_page in child_pages:
-        if child_page.title == "test_page":
+        if "test_page" in child_page.title:
             print(f"deleting {child_page.title}")
             child_page.delete_page()
+        if "Planning" in child_page.title:
+            planning_page = "planning_page"
+            json_dir = f"{planning_page}/json"
+            md_dir = f"{planning_page}/md"
+            md_path = exporter.export_page(page_id=child_page.page_id, json_dir=json_dir, md_dir=md_dir)
+            json_path = Path(json_dir)
+            assert md_path.is_file()
+            assert md_path.suffix == ".md"
+            assert json_path.exists()
+            assert json_path.is_dir()
 
     test_page = int_page.add_page(title=f"test_page {datetime.now(tz=pytz.utc)}")
     assert test_page
 
+    blocks = []
+    blocks.append(NotionBlock.create_table_of_contents_block())
+    blocks.append(NotionBlock.create_heading_block("I'm a heading.", level=1))
+    blocks.append(NotionBlock.create_paragraph_block("I'm a red bold italic paragraph.", color="red", bold=True, italic=True))
+    blocks.append(NotionBlock.create_heading_block("I'm a blue bold italic heading.", level=2, color="blue", bold=True, italic=True))
+    blocks.append(NotionBlock.create_bulleted_list_block(["I'm a bulleted list.", "I'm a bulleted list."]))
+    blocks.append(NotionBlock.create_heading_block("I'm a heading.", level=3))
+    blocks.append(NotionBlock.create_numbered_list_block(["I'm a numbered list.", "I'm a numbered list."]))
+    blocks.append(NotionBlock.create_heading_block("I'm a heading."))
+    blocks.append(NotionBlock.create_heading_block("I'm a heading.", level=2))
+    blocks.append(NotionBlock.create_to_do_block("I'm a to-do list.", checked=True))
+    blocks.append(NotionBlock.create_heading_block("I'm a heading.", level=2))
+    blocks.append(NotionBlock.create_to_do_block("I'm a to-do list.", checked=False))
+    blocks.append(NotionBlock.create_quote_block("I'm a quote."))
+    blocks.append(NotionBlock.create_heading_block("I'm a heading.", level=2))
+    blocks.append(NotionBlock.create_code_block("import os", language="python"))
+    blocks.append(NotionBlock.create_code_block("#include <stdio.h>", language="c"))
+    # create_embed_block(url: str) -> dict:
+    blocks.append(
+        NotionBlock.create_embed_block(
+            "https://www.notion.so/cosgroma/Planning-for-product-development-cb0163c37cca49848345104644b544d9?pvs=4"
+        )
+    )
+    # create_toggle_block(text: str, children: List[dict] = None) -> dict:
+    blocks.append(
+        NotionBlock.create_toggle_block("I'm a toggle list.", children=[NotionBlock.create_paragraph_block("I'm a child block.")])
+    )
+    # create_divider_block() -> dict:
+    blocks.append(NotionBlock.create_divider_block())
+    blocks.append(NotionBlock.create_link_to_page_block(page_id=PAGE_ID))
+
+    # create_table_block(rows: List[List[str]], headers: Optional[List[str]] = None) -> dict:
+    # blocks.append(NotionBlock.create_table_block([["A", "B"], ["1", "2"]], headers=["A", "B"]))
+    # create_breadcrumb_block(items: List[Dict[str, str]]) -> dict:
+    # blocks.append(NotionBlock.create_breadcrumb_block([{"text": "A", "url": "https://www.notion.so/cosgroma/Planning-for-product-development-cb0163c37cca49848345104644b544d9?pvs=4"}]))
+    # create_callout_block(icon: str, text: str) -> dict:
+    # blocks.append(NotionBlock.create_callout_block(icon="🚀", text="I'm a callout."))
+
+    # create_column_list_block(columns: List[List[dict]]) -> dict:
+    # blocks.append(NotionBlock.create_column_list_block(columns=[[NotionBlock.create_paragraph_block("I'm a column."), NotionBlock.create_paragraph_block("I'm a column.")]]))
+    # create_column_block(blocks: List[dict]) -> dict:
+    # blocks.append(NotionBlock.create_column_block(blocks=[NotionBlock.create_paragraph_block("I'm a column."), NotionBlock.create_paragraph_block("I'm a column.")]))
+
+    test_page.set_blocks(blocks=blocks)
     # def get_page(self, force: bool = False) -> Page:
     # def get_blocks(self, force: bool = False) -> List[dict]:
     # def set_blocks(self, blocks: List[dict], clear: bool = False):
