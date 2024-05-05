@@ -136,6 +136,94 @@ def create_rich_text(
     }
 
 
+class RichText:
+    def __init__(
+        self,
+        text: str,
+        link: Optional[str] = None,
+        bold: bool = False,
+        italic: bool = False,
+        strikethrough: bool = False,
+        underline: bool = False,
+        code: bool = False,
+        color: str = "default",
+    ) -> None:
+        self.text = text
+        self.link = link
+        self.bold = bold
+        self.italic = italic
+        self.strikethrough = strikethrough
+        self.underline = underline
+        self.code = code
+        self.color = color
+
+    def set_annotations(
+        self,
+        bold: bool = False,
+        italic: bool = False,
+        strikethrough: bool = False,
+        underline: bool = False,
+        code: bool = False,
+        color: str = "default",
+    ) -> None:
+        self.bold = bold
+        self.italic = italic
+        self.strikethrough = strikethrough
+        self.underline = underline
+        self.code = code
+        self.color = color
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "type": "text",
+            "text": {"content": self.text, "link": self.link},
+            "annotations": {
+                "bold": self.bold,
+                "italic": self.italic,
+                "strikethrough": self.strikethrough,
+                "underline": self.underline,
+                "code": self.code,
+                "color": self.color,
+            },
+            "plain_text": self.text,
+            "href": None,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "RichText":
+        text = data["text"]["content"]
+        link = data["text"]["link"]
+        bold = data["annotations"]["bold"]
+        italic = data["annotations"]["italic"]
+        strikethrough = data["annotations"]["strikethrough"]
+        underline = data["annotations"]["underline"]
+        code = data["annotations"]["code"]
+        color = data["annotations"]["color"]
+        return cls(text, link, bold, italic, strikethrough, underline, code, color)
+
+
+# class Block:
+#     def __init__(self, type: str, rich_text: List[Dict[str, Any]], color: str = "default") -> None:
+#         self.type = type
+#         self.rich_text = rich_text
+#         self.color = color
+
+#     def to_dict(self) -> Dict[str, Any]:
+#         return {
+#             self.type: {
+#                 "rich_text": self.rich_text,
+#                 "color": self.color,
+#             }
+#         }
+
+#     @classmethod
+#     def from_dict(cls, data: Dict[str, Any]) -> "Block":
+#         type = list(data.keys())[0]
+#         rich_text = data[type]["rich_text"]
+#         color = data[type]["color"]
+#         return cls(type, rich_text, color)
+
+
 def create_paragraph_block(
     text: str,
     color: str = "default",
