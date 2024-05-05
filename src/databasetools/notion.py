@@ -5,13 +5,14 @@ from typing import Any
 from typing import Dict
 from typing import List
 from typing import Optional
+from typing import Tuple
 from typing import Union
 
 from notion_client import Client
 from notion_client.helpers import iterate_paginated_api as paginate
-from notion_objects import Database
 from notion_objects import Page
 
+from .utils import find_title_prop
 from .utils import logger
 from .utils import normalize_id
 
@@ -93,6 +94,7 @@ class NotionIO:
 
 class NotionClient:
     def __init__(self, token: str, transformer: LastEditedToDateTime = None, filter: Optional[dict] = None):
+        self.token = token
         self.client = Client(auth=token)
         if transformer is None:
             transformer = LastEditedToDateTime()
@@ -191,30 +193,103 @@ class NotionClient:
 
 
 class NotionPage:
-    def __init__(self, token: str, page_id: str):
-        self.client = Client(auth=token)
+    def __init__(self, token: str, page_id: str, load: bool = False):
+        self.token = token
+        self.n_client = NotionClient(token)
         self.page_id = page_id
-        self.page = self.client.pages.retrieve(page_id=page_id)
+        self.child_pages: List["NotionPage"] = []
+        self.blocks: List[dict] = []
+        self.page = None
+        self.title = None
+        self.page_results: dict = {}
+        self.get_page()
+        if load:
+            self.get_blocks()
 
-    def get_page(self) -> Page:
+    def get_page(self, force: bool = False) -> Tuple[Page, dict]:
         """Get a page."""
-        return Page.from_dict(self.page)
+        if force or not self.page:
+            self.page_results = self.n_client.client.pages.retrieve(page_id=self.page_id)
+            self.page = Page(self.page_results)
 
-    def get_blocks(self) -> List[dict]:
+            if self.page_results["parent"]["type"] != "database_id":
+                title_prop = "title"
+            else:
+                title_prop = find_title_prop(self.page_results["properties"])
+
+            self.title = self.page_results["properties"][title_prop]["title"][0]["text"]["content"]
+
+        return self.page, self.page_results
+
+    def get_blocks(self, force: bool = False) -> List[dict]:
         """Get all blocks in a page."""
-        return self.client.blocks.children.list(block_id=self.page_id).get("results")
+        if force or not self.blocks:
+            self.blocks = self.n_client.get_blocks(self.page_id)
+        return self.blocks
 
     def set_blocks(self, blocks: List[dict], clear: bool = False):
         """Set all blocks in a page."""
-        if clear:
-            self.client.blocks.children.append(block_id=self.page_id, children=blocks)
-        else:
-            self.client.blocks.children.update(block_id=self.page_id, children=blocks)
+        self.n_client.client.blocks.children.append(block_id=self.page_id, children=blocks)
 
-    def add_page(self, page: Page):
+    def clear_blocks(self):
+        """Clear all blocks in a page."""
+
+        blocks = self.get_blocks()
+        for block in blocks:
+            self.n_client.client.blocks.delete(block_id=block["id"])
+
+    def add_page(self, title: str) -> "NotionPage":
         """Add a page to the current page."""
-        self.client.blocks.children.append(block_id=self.page_id, children=[page.to_dict()])
+        page = self.n_client.client.pages.create(
+            parent={"page_id": self.page_id},
+            properties={"title": [{"text": {"content": title}}]},
+        )
+        return NotionPage(token=self.n_client.token, page_id=page["id"], load=False)
 
-    def add_database(self, database: Database):
-        """Add a database to the current page."""
-        self.client.databases.create(parent={"page_id": self.page_id}, database=database.to_dict())
+    def get_child_pages(self, force: bool = False) -> List["NotionPage"]:
+        """Get Child Pages.
+
+        Args:
+            page_id (str): Page ID
+
+        Returns:
+            List[dict]: List of Child Pages
+        """
+
+        if force or not self.child_pages:
+            blocks = self.get_blocks()
+
+            for block in blocks:
+                if block["type"] == "child_page":
+                    self.child_pages.append(NotionPage(token=self.n_client.token, page_id=block["id"], load=False))
+        return self.child_pages
+
+    # def get_child_databases(self, force: bool = False) -> List["NotionPage"]:
+    #     """Get Child Databases.
+
+    #     Args:
+    #         page_id (str): Page ID
+
+    #     Returns:
+    #         List[dict]: List of Child Databases
+    #     """
+    #     if force or not self.child_pages:
+    #         blocks = self.get_blocks()
+
+    #         for block in blocks:
+    #             if block["type"] == "database":
+    #                 self.child_pages.append(NotionPage(token=self.n_client.token, page_id=block["id"], load=False))
+    #     return self.child_pages
+
+    def delete_child_pages(self):
+        """Delete Child Pages."""
+        for page in self.child_pages:
+            self.n_client.client.blocks.delete(block_id=page.page_id)
+            self.child_pages.remove(page)
+
+    def delete_page(self):
+        """Delete Page."""
+        self.n_client.client.blocks.delete(block_id=self.page_id)
+
+    def __repr__(self):
+        return f"NotionPage(title={self.title}, page_id={self.page_id})"

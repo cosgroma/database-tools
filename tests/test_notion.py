@@ -4,10 +4,14 @@
 
 import os
 import shutil
+from datetime import datetime
 from pathlib import Path
+
+import pytz
 
 from databasetools import NotionClient
 from databasetools import NotionExporter
+from databasetools import NotionPage
 
 NOTION_API_KEY = os.getenv("NOTION_API_KEY")
 PAGE_URL = os.getenv("PAGE_URL")
@@ -95,3 +99,58 @@ def test_exporter_export_database():
     assert json_path.exists()
     assert len(os.listdir(json_dir)) > 0
     shutil.rmtree(test_db_name)
+
+
+TEST_PLANNING_PAGE_URL = "https://www.notion.so/cosgroma/Planning-for-product-development-cb0163c37cca49848345104644b544d9?pvs=4"
+
+# class Page(NotionObject):
+#     id: str = Id()
+#     created_time: datetime = RootProperty()
+#     last_edited_time: datetime = RootProperty()
+
+
+def test_notion_page():
+    # Make test directory
+    assert NOTION_API_KEY, "NOTION_API_KEY not set, set it in .env file"
+    assert TEST_PLANNING_PAGE_URL, "TEST_PLANNING_PAGE_URL not set, set it in .env file"
+    # page_id = extract_id_from_notion_url(TEST_PLANNING_PAGE_URL)
+    # page_id = NotionPage.get_page_id_from_url(url=TEST_PLANNING_PAGE_URL)
+    int_page = NotionPage(token=NOTION_API_KEY, page_id=PAGE_ID)
+    page, page_results = int_page.get_page()
+    assert page
+    assert page_results
+    page_id_no_dash = page.id.replace("-", "")
+    assert PAGE_ID == page_id_no_dash
+    # assert page.properties
+    blocks = int_page.get_blocks()
+    assert blocks
+    assert len(blocks) > 0
+
+    child_pages = int_page.get_child_pages()
+    assert child_pages
+    assert len(child_pages) > 0
+
+    for child_page in child_pages:
+        if child_page.title == "test_page":
+            print(f"deleting {child_page.title}")
+            child_page.delete_page()
+
+    test_page = int_page.add_page(title=f"test_page {datetime.now(tz=pytz.utc)}")
+    assert test_page
+
+    # def get_page(self, force: bool = False) -> Page:
+    # def get_blocks(self, force: bool = False) -> List[dict]:
+    # def set_blocks(self, blocks: List[dict], clear: bool = False):
+    # def clear_blocks(self):
+    # def add_page(self, title: str, title_prop: Optional[str] = "Name") -> "NotionPage":
+    # def get_child_pages(self, force: bool = False) -> List["NotionPage"]:
+    # def delete_child_pages(self):
+
+
+if __name__ == "__main__":
+    # test_client()
+    # test_exporter_export_url()
+    # test_exporter_export_page()
+    # test_exporter_export_database()
+    test_notion_page()
+    print("databasetools tests passed")
