@@ -14,51 +14,10 @@ from notion_objects import Database
 from notion_objects import NotionObject
 from notion_objects import Page
 
+from .json2md import JsonToMdConverter
 from .utils import find_title_prop
 from .utils import logger
 from .utils import normalize_id
-
-
-class NotionDownloader:
-    def __init__(self, token: str, filter: Optional[str] = None):
-        self.transformer = LastEditedToDateTime()
-        self.notion = NotionClient(token=token, transformer=self.transformer, filter=filter)
-        self.io = NotionIO(self.transformer)
-
-    def download_url(self, url: str, out_dir: Union[str, Path] = "./json"):
-        """Download the notion page or database."""
-        out_dir = Path(out_dir)
-        slug = url.split("/")[-1].split("?")[0]
-        if "-" in slug:
-            page_id = slug.split("-")[-1]
-            self.download_page(page_id, out_dir / f"{page_id}.json")
-        else:
-            self.download_database(slug, out_dir)
-
-    def download_page(self, page_id: str, out_path: Union[str, Path] = "./json", fetch_metadata: bool = True):
-        """Download the notion page."""
-        out_path = Path(out_path)
-        out_path.parent.mkdir(parents=True, exist_ok=True)
-        blocks = self.notion.get_blocks(page_id)
-        self.io.save(blocks, out_path)
-
-        if fetch_metadata:
-            metadata = self.notion.get_metadata(page_id)
-            self.io.save([metadata], out_path.parent / "database.json")
-
-    def download_database(self, database_id: str, out_dir: Union[str, Path] = "./json"):
-        """Download the notion database and associated pages."""
-        out_dir = Path(out_dir)
-        out_dir.mkdir(parents=True, exist_ok=True)
-        path = out_dir / "database.json"
-        prev = {pg["id"]: pg["last_edited_time"] for pg in self.io.load(path)}
-        pages = self.notion.get_database(database_id)  # download database
-        self.io.save(pages, path)
-
-        for cur in pages:  # download individual pages in database IF updated
-            if prev.get(cur["id"], datetime(1, 1, 1, tzinfo=cur["last_edited_time"].tzinfo)) < cur["last_edited_time"]:
-                self.download_page(cur["id"], out_dir / f"{cur['id']}.json", False)
-                logger.info(f"Downloaded {cur['url']}")
 
 
 class LastEditedToDateTime:
@@ -77,37 +36,15 @@ class LastEditedToDateTime:
             return o.isoformat() + "Z"
 
 
-class NotionIO:
-    def __init__(self, transformer):
-        self.transformer = transformer
-
-    def load(self, path: Union[str, Path]) -> List[dict]:
-        """Load blocks from json file."""
-        if Path(path).exists():
-            with Path.open(path) as f:
-                return self.transformer.forward(json.load(f))
-        return []
-
-    def save(self, blocks: List[dict], path: str):
-        """Dump blocks to json file."""
-        with Path.open(path, "w") as f:
-            json.dump(blocks, f, default=self.transformer.reverse, indent=4)
-
-
 class NotionClient:
     def __init__(self, token: str, transformer: LastEditedToDateTime = None, filter: Optional[dict] = None):
         self.token = token
-        self.client = Client(auth=token)
-        if transformer is None:
-            transformer = LastEditedToDateTime()
-        self.transformer = transformer
         self.filter = filter
-        self.database_records = {}
-        # with open("~/database_records.json", "r") as f:
-        #     self.database_records = json.load(f)
+        self.client = Client(auth=token)
+        self.transformer = transformer if transformer else LastEditedToDateTime()
 
-    def get_metadata(self, page_id: str) -> dict:
-        """Get page metadata as json."""
+    def get_metadata(self, page_id: str) -> Dict[str, Any]:
+        """Get page metadata"""
         return self.transformer.forward([self.client.pages.retrieve(page_id=page_id)])[0]
 
     def get_recent_pages(self) -> List[Dict[str, Any]]:
@@ -171,6 +108,87 @@ class NotionClient:
             )
         pages = [self.client.pages.retrieve(page_id=pg["id"]) for pg in results]
         return list(self.transformer.forward(pages))
+
+
+class NotionDownloader:
+    def __init__(self, token: str, filter: Optional[str] = None):
+        self.transformer = LastEditedToDateTime()
+        self.notion = NotionClient(token=token, transformer=self.transformer, filter=filter)
+        self.io = NotionIO(self.transformer)
+
+    def download_url(self, url: str, out_dir: Union[str, Path] = "./json"):
+        """Download the notion page or database."""
+        out_dir = Path(out_dir)
+        slug = url.split("/")[-1].split("?")[0]
+        if "-" in slug:
+            page_id = slug.split("-")[-1]
+            self.download_page(page_id, out_dir / f"{page_id}.json")
+        else:
+            self.download_database(slug, out_dir)
+
+    def download_page(self, page_id: str, out_path: Union[str, Path] = "./json", fetch_metadata: bool = True):
+        """Download the notion page."""
+        out_path = Path(out_path)
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        blocks = self.notion.get_blocks(page_id)
+        self.io.save(blocks, out_path)
+
+        if fetch_metadata:
+            metadata = self.notion.get_metadata(page_id)
+            self.io.save([metadata], out_path.parent / "database.json")
+
+    def download_database(self, database_id: str, out_dir: Union[str, Path] = "./json"):
+        """Download the notion database and associated pages."""
+        out_dir = Path(out_dir)
+        out_dir.mkdir(parents=True, exist_ok=True)
+        path = out_dir / "database.json"
+        prev = {pg["id"]: pg["last_edited_time"] for pg in self.io.load(path)}
+        pages = self.notion.get_database(database_id)  # download database
+        self.io.save(pages, path)
+
+        for cur in pages:  # download individual pages in database IF updated
+            if prev.get(cur["id"], datetime(1, 1, 1, tzinfo=cur["last_edited_time"].tzinfo)) < cur["last_edited_time"]:
+                self.download_page(cur["id"], out_dir / f"{cur['id']}.json", False)
+                logger.info(f"Downloaded {cur['url']}")
+
+
+class NotionExporter:
+    def __init__(self, token: str, strip_meta_chars: Optional[str] = None, extension: str = "md", filter: Optional[dict] = None):
+        self.downloader = NotionDownloader(token, filter)
+        self.converter = JsonToMdConverter(strip_meta_chars=strip_meta_chars, extension=extension)
+
+    def export_url(self, url: str, json_dir: Union[str, Path] = "./json", md_dir: Union[str, Path] = "./md") -> Path:
+        """Export the notion page or database."""
+        self.downloader.download_url(url, json_dir)
+        return self.converter.convert(json_dir, md_dir)
+
+    def export_database(self, database_id: str, json_dir: Union[str, Path] = "./json", md_dir: Union[str, Path] = "./md") -> Path:
+        """Export the notion database and associated pages."""
+        self.downloader.download_database(database_id, json_dir)
+        return self.converter.convert(json_dir, md_dir)
+
+    def export_page(self, page_id: str, json_dir: Union[str, Path] = "./json", md_dir: Union[str, Path] = "./md"):
+        """Export the notion page."""
+        json_dir_path = Path(json_dir)
+        self.downloader.download_page(page_id, json_dir_path / f"{page_id}.json")
+        return self.converter.convert(json_dir, md_dir)
+
+
+class NotionIO:
+    def __init__(self, transformer):
+        self.transformer = transformer
+
+    def load(self, path: Union[str, Path]) -> List[dict]:
+        """Load blocks from json file."""
+        if Path(path).exists():
+            with Path.open(path) as f:
+                return self.transformer.forward(json.load(f))
+        return []
+
+    def save(self, blocks: List[dict], path: str):
+        """Dump blocks to json file."""
+        with Path.open(path, "w") as f:
+            json.dump(blocks, f, default=self.transformer.reverse, indent=4)
 
 
 class NotionPage:
