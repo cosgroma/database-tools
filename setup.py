@@ -11,6 +11,11 @@ def read(*names, **kwargs):
         return fh.read()
 
 
+def read_requirements(path):
+    with Path.open(path) as file:
+        return file.read().splitlines()
+
+
 setup(
     name="databasetools",
     version="0.0.0",
@@ -63,6 +68,7 @@ setup(
         "notion-database==1.2.0",
         "notion-df==0.0.5",
         "notion-objects==0.6.2",
+        "slugify",
     ],
     extras_require={
         # eg:
