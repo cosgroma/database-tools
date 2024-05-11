@@ -154,9 +154,9 @@ def test_notion_page():
     blocks.append(NotionBlock.create_heading_block("I'm a heading.", level=1))
     blocks.append(NotionBlock.create_paragraph_block("I'm a red bold italic paragraph.", color="red", bold=True, italic=True))
     blocks.append(NotionBlock.create_heading_block("I'm a blue bold italic heading.", level=2, color="blue", bold=True, italic=True))
-    blocks.append(NotionBlock.create_bulleted_list_block(["I'm a bulleted list.", "I'm a bulleted list."]))
+    blocks.append(NotionBlock.create_list_block(["I'm a bulleted list.", "I'm a bulleted list."], numbered=False))
     blocks.append(NotionBlock.create_heading_block("I'm a heading.", level=3))
-    blocks.append(NotionBlock.create_numbered_list_block(["I'm a numbered list.", "I'm a numbered list."]))
+    blocks.append(NotionBlock.create_list_block(["I'm a numbered list.", "I'm a numbered list."], numbered=True))
     blocks.append(NotionBlock.create_heading_block("I'm a heading."))
     blocks.append(NotionBlock.create_heading_block("I'm a heading.", level=2))
     blocks.append(NotionBlock.create_to_do_block("I'm a to-do list.", checked=True))
@@ -200,6 +200,136 @@ def test_notion_page():
     # def add_page(self, title: str, title_prop: Optional[str] = "Name") -> "NotionPage":
     # def get_child_pages(self, force: bool = False) -> List["NotionPage"]:
     # def delete_child_pages(self):
+
+
+def test_create_paragraph_block():
+    block = NotionBlock.create_paragraph_block("I'm a paragraph.")
+    assert block
+    assert block["paragraph"]
+    assert block["paragraph"]["rich_text"]
+    assert block["paragraph"]["rich_text"][0]["plain_text"] == "I'm a paragraph."
+    assert block["paragraph"]["color"] == "default"
+
+    block = NotionBlock.create_paragraph_block("I'm a red paragraph.", color="red")
+    assert block
+    assert block["paragraph"]
+    assert block["paragraph"]["rich_text"]
+    assert block["paragraph"]["rich_text"][0]["plain_text"] == "I'm a red paragraph."
+    assert block["paragraph"]["color"] == "red"
+
+    block = NotionBlock.create_paragraph_block(
+        "I'm a link paragraph.",
+        link="https://www.notion.so/cosgroma/Planning-for-product-development-cb0163c37cca49848345104644b544d9?pvs=4",
+    )
+    assert block
+    assert block["paragraph"]
+    assert block["paragraph"]["rich_text"]
+    assert block["paragraph"]["rich_text"][0]["plain_text"] == "I'm a link paragraph."
+    assert (
+        block["paragraph"]["rich_text"][0]["href"]
+        == "https://www.notion.so/cosgroma/Planning-for-product-development-cb0163c37cca49848345104644b544d9?pvs=4"
+    )
+
+    block = NotionBlock.create_paragraph_block("I'm a bold paragraph.", bold=True)
+    assert block
+    assert block["paragraph"]
+    assert block["paragraph"]["rich_text"]
+    assert block["paragraph"]["rich_text"][0]["plain_text"] == "I'm a bold paragraph."
+    assert block["paragraph"]["rich_text"][0]["annotations"]["bold"]
+
+    block = NotionBlock.create_paragraph_block("I'm an italic paragraph.", italic=True)
+    assert block
+    assert block["paragraph"]
+    assert block["paragraph"]["rich_text"]
+    assert block["paragraph"]["rich_text"][0]["plain_text"] == "I'm an italic paragraph."
+    assert block["paragraph"]["rich_text"][0]["annotations"]["italic"]
+
+    block = NotionBlock.create_paragraph_block("I'm a strikethrough paragraph.", strikethrough=True)
+    assert block
+    assert block["paragraph"]
+    assert block["paragraph"]["rich_text"]
+    assert block["paragraph"]["rich_text"][0]["plain_text"] == "I'm a strike-through paragraph."
+
+
+def test_create_heading_block():
+    block = NotionBlock.create_heading_block("I'm a heading.")
+    assert block
+    assert block["heading_1"]
+    assert block["heading_1"]["text"][0]["plain_text"] == "I'm a heading."
+
+    block = NotionBlock.create_heading_block("I'm a heading.", level=2)
+    assert block
+    assert block["heading_2"]
+    assert block["heading_2"]["text"][0]["plain_text"] == "I'm a heading."
+
+    block = NotionBlock.create_heading_block("I'm a heading.", level=3)
+    assert block
+    assert block["heading_3"]
+    assert block["heading_3"]["text"][0]["plain_text"] == "I'm a heading."
+
+    block = NotionBlock.create_heading_block("I'm expect a value error", level=4)
+    assert not block
+
+
+def test_create_numbered_list_block(): ...
+
+
+def test_create_bullet_list_block():
+    # blocks.append(NotionBlock.create_list_block(["I'm a bulleted list.", "I'm a bulleted list."], numbered=False))
+    ...
+
+
+def test_create_to_do_block(): ...
+
+
+def test_create_rich_text(): ...
+
+
+def test_create_quote_block(): ...
+
+
+def test_create_code_block(): ...
+
+
+def test_create_embed_block(): ...
+
+
+def test_create_toggle_block(): ...
+
+
+def test_create_divider_block(): ...
+
+
+def test_create_table_block(): ...
+
+
+def test_create_breadcrumb_block(): ...
+
+
+def test_create_callout_block(): ...
+
+
+def test_create_link_to_page_block(): ...
+
+
+def test_create_table_of_contents_block(): ...
+
+
+def test_notion_block():
+    test_create_paragraph_block()
+    test_create_heading_block()
+    test_create_to_do_block()
+    test_create_rich_text()
+    test_create_quote_block()
+    test_create_code_block()
+    test_create_embed_block()
+    test_create_toggle_block()
+    test_create_divider_block()
+    test_create_table_block()
+    test_create_breadcrumb_block()
+    test_create_callout_block()
+    test_create_link_to_page_block()
+    test_create_table_of_contents_block()
 
 
 if __name__ == "__main__":

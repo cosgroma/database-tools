@@ -192,36 +192,49 @@ class RichText:
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "RichText":
         text = data["text"]["content"]
-        link = data["text"]["link"]
-        bold = data["annotations"]["bold"]
-        italic = data["annotations"]["italic"]
-        strikethrough = data["annotations"]["strikethrough"]
-        underline = data["annotations"]["underline"]
-        code = data["annotations"]["code"]
-        color = data["annotations"]["color"]
+        link = data.get("link", None)
+        bold = data.get("annotations", {}).get("bold", False)
+        italic = data.get("annotations", {}).get("italic", False)
+        strikethrough = data.get("annotations", {}).get("strikethrough", False)
+        underline = data.get("annotations", {}).get("underline", False)
+        code = data.get("annotations", {}).get("code", False)
+        color = data.get("annotations", {}).get("color", "default")
         return cls(text, link, bold, italic, strikethrough, underline, code, color)
 
 
-# class Block:
-#     def __init__(self, type: str, rich_text: List[Dict[str, Any]], color: str = "default") -> None:
-#         self.type = type
-#         self.rich_text = rich_text
-#         self.color = color
+class Block:
+    def __init__(self, type: str, rich_text: Dict[str, Any], color: str = "default") -> None:
+        self.type = type
+        self.rich_text = RichText.from_dict(rich_text)
+        self.color = color
+        self.has_children = False
+        self.children: List[Block] = []
 
-#     def to_dict(self) -> Dict[str, Any]:
-#         return {
-#             self.type: {
-#                 "rich_text": self.rich_text,
-#                 "color": self.color,
-#             }
-#         }
+    def set_rich_text(self, rich_text: RichText) -> None:
+        self.rich_text = rich_text
 
-#     @classmethod
-#     def from_dict(cls, data: Dict[str, Any]) -> "Block":
-#         type = list(data.keys())[0]
-#         rich_text = data[type]["rich_text"]
-#         color = data[type]["color"]
-#         return cls(type, rich_text, color)
+    def add_child(self, block: "Block") -> None:
+        self.children.append(block)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            self.type: {
+                "rich_text": self.rich_text.to_dict(),
+                "color": self.color,
+            }
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "Block":
+        type = next(iter(data.keys()))
+        if data["has_children"]:
+            children = [cls.from_dict(child) for child in data["children"]]
+        rich_text = RichText.from_dict(data[type]["rich_text"])
+        color = data[type]["color"]
+        block = cls(type, rich_text, color)
+        for child in children:
+            block.add_child(child)
+        return block
 
 
 def create_paragraph_block(
@@ -278,12 +291,43 @@ def create_heading_block(
     underline: bool = False,
     code: bool = False,
     color: str = "default",
+    toggleable: bool = False,
 ) -> dict:
-    return {f"heading_{level}": {"rich_text": [create_rich_text(text, link, bold, italic, strikethrough, underline, code, color)]}}
+    if level not in (1, 2, 3):
+        raise ValueError("Level must be 1, 2, or 3")
+    return {
+        f"heading_{level}": {
+            "rich_text": [create_rich_text(text, link, bold, italic, strikethrough, underline, code, color)],
+            "is_toggleable": toggleable,
+            "color": color,
+        }
+    }
 
 
-def create_bulleted_list_block(
+def create_list_block(
     items: List[str],
+    numbered: bool = False,
+    link: Optional[str] = None,
+    bold: bool = False,
+    italic: bool = False,
+    strikethrough: bool = False,
+    underline: bool = False,
+    code: bool = False,
+    color: str = "default",
+) -> dict:
+    if numbered:
+        type = "numbered_list_item"
+    else:
+        type = "bulleted_list_item"
+    return [{type: {"rich_text": create_rich_text(text, link, bold, italic, strikethrough, underline, code, color)}} for text in items]
+
+
+# def create_block(type: str, content: Union[str, List[str]], color: str = "default") -> Dict[str, Any]:
+
+
+def create_to_do_block(
+    text: str,
+    checked: bool = False,
     link: Optional[str] = None,
     bold: bool = False,
     italic: bool = False,
@@ -293,27 +337,30 @@ def create_bulleted_list_block(
     color: str = "default",
 ) -> dict:
     return {
-        "bulleted_list_item": {
-            "rich_text": [create_rich_text(text, link, bold, italic, strikethrough, underline, code, color) for text in items]
-        }
-    }
-
-
-def create_numbered_list_block(items: List[str]) -> Dict[str, Any]:
-    return {"numbered_list_item": {"rich_text": [{"type": "text", "text": {"content": text}} for text in items]}}
-
-
-def create_to_do_block(text: str, checked: bool = False) -> Dict[str, Any]:
-    return {
         "to_do": {
-            "rich_text": [{"type": "text", "text": {"content": text}}],
+            "rich_text": create_rich_text(text, link, bold, italic, strikethrough, underline, code, color),
             "checked": checked,
         }
     }
 
 
-def create_quote_block(text: str) -> Dict[str, Any]:
-    return {"quote": {"rich_text": [{"type": "text", "text": {"content": text}}]}}
+def create_quote_block(
+    text: str,
+    children: Optional[List[Dict[str, Any]]] = None,
+    link: Optional[str] = None,
+    bold: bool = False,
+    italic: bool = False,
+    strikethrough: bool = False,
+    underline: bool = False,
+    code: bool = False,
+    color: str = "default",
+) -> dict:
+    return {
+        "quote": {
+            "rich_text": create_rich_text(text, link, bold, italic, strikethrough, underline, code, color),
+            "children": children or [],
+        }
+    }
 
 
 def create_code_block(text: str, language: str = "") -> Dict[str, Any]:

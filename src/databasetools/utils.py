@@ -21,6 +21,7 @@ from typing import Union
 from uuid import UUID
 
 from dateutil.parser import parse
+from slugify import slugify as _dash_slugify
 
 RICH_TEXT_CONTENT_MAX_LENGTH = 2000
 RICH_TEXT_LINK_MAX_LENGTH = 1000
@@ -243,3 +244,7 @@ def multi_select_from_list(keywords: List[str]) -> Dict[str, Any]:
         Dict[str, Any]: Properties Dict.
     """
     return {"multi_select": [{"name": keyword} for keyword in keywords]}
+
+
+def slugify(original):
+    return _dash_slugify(original).replace("-", "_")
