@@ -1,3 +1,10 @@
+click
+python-dotenv==1.0.1
+python-dateutil==2.9.0.post0
+fuzzywuzzy
+levenshtein
 notion-client>=0.8.0
-dotenv>=0.15.0
-slugify
+notion-database==1.2.0
+notion-objects==0.6.2
+unicode
+pytz

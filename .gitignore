@@ -74,3 +74,5 @@ docs/_build
 .mypy_cache/
 
 sandbox/**
+output/**
+# src/databasetools/version.py

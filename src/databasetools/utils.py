@@ -12,6 +12,8 @@ Modified By: Mathew Cosgrove
 """
 
 import logging
+import re
+import unicodedata
 import uuid
 from typing import Any
 from typing import Dict
@@ -21,7 +23,6 @@ from typing import Union
 from uuid import UUID
 
 from dateutil.parser import parse
-from slugify import slugify as _dash_slugify
 
 RICH_TEXT_CONTENT_MAX_LENGTH = 2000
 RICH_TEXT_LINK_MAX_LENGTH = 1000
@@ -247,4 +248,15 @@ def multi_select_from_list(keywords: List[str]) -> Dict[str, Any]:
 
 
 def slugify(original):
-    return _dash_slugify(original).replace("-", "_")
+    """
+    Slugify a unicode string.
+
+    Example:
+
+        >>> slugify(u"Héllø Wörld")
+        u"hello-world"
+
+    """
+    original = unicodedata.normalize("NFKD", original).encode("ascii", "ignore").decode("ascii")
+    original = re.sub(r"[^\w\s-]", "", original).strip().lower()
+    return re.sub(r"[-\s]+", "-", original)

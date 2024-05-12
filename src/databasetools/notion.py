@@ -54,6 +54,7 @@ from typing import Optional
 from typing import Tuple
 from typing import Union
 
+from fuzzywuzzy import fuzz
 from notion_client import Client
 from notion_client.helpers import iterate_paginated_api as paginate
 from notion_objects import Database
@@ -513,7 +514,7 @@ class NotionPage:
         if force or not self.child_databases:
             blocks = self.get_blocks()
             for block in blocks:
-                if block["type"] == "database_id":
+                if block["type"] == "child_database":
                     self.child_databases.append(NotionDatabase(token=self.n_client.token, database_id=block["id"]))
         return self.child_databases
 
@@ -531,7 +532,13 @@ class NotionPage:
         return f"NotionPage(title={self.title}, page_id={self.page_id})"
 
 
-def generate_model_class_code(class_name: str, properties: Dict[str, Any]) -> str:
+def create_code_name(name: str) -> str:
+    return name.replace(" ", "_").replace("-", "_").replace(".", "_").replace("/", "_")
+
+
+def generate_model_class_code(class_name: str, properties: Dict[str, Any], file_path: Optional[Union[str, Path]] = None) -> str:
+    # remove spaces and special characters from class name
+    class_name = create_code_name(class_name)
     class_code = f"class {class_name}(NotionObject):\n"
     property_map = {
         "title": "TitleText",
@@ -544,41 +551,224 @@ def generate_model_class_code(class_name: str, properties: Dict[str, Any]) -> st
 
     for prop_name, prop_info in properties.items():
         prop_type = property_map.get(prop_info["type"], "Text")  # Default to Text if type is not mapped
-        class_code += f"    {prop_name.lower()} = {prop_type}('{prop_name}')\n"
+        class_code += f"    {create_code_name(prop_name.lower())} = {prop_type}('{prop_name}')\n"
 
+    if not file_path:
+        # print(class_code)
+        file_path = Path.cwd() / f"{class_name}.py"
+
+    with Path.open(file_path, "w") as f:
+        f.write(class_code)
     return class_code
 
 
-def write_model_to_file(class_code: str, file_path: Union[str, Path]):
-    with Path.open(file_path, "w") as f:
-        f.write(class_code)
+DATABASE_PROPERTIES = {
+    "number": {},
+    "formula": {},
+    "select": {},
+    "multi_select": {},
+    "status": {},
+    "relation": {},
+    "rollup": {},
+    "unique_id": {},
+    "title": {},
+    "rich_text": {},
+    "url": {},
+    "people": {},
+    "files": {},
+    "email": {},
+    "phone_number": {},
+    "date": {},
+    "checkbox": {},
+    "created_by": {},
+    "created_time": {},
+    "last_edited_by": {},
+    "last_edited_time": {},
+    "button": {},
+    "location": {},
+    "verification": {},
+    "last_visited_time": {},
+    "name": {},
+}
 
 
 class NotionDatabase:
-    def __init__(self, token: str, database_id: str, DataClass: Optional[NotionObject] = None):
+    def __init__(self, token: str, database_id: Optional[str] = None, DataClass: Optional[NotionObject] = None):
         self.token = token
-        self.n_client = NotionClient(auth=token)
-
+        self.n_client = NotionClient(token=token)
         self.database_id = database_id
+
         if DataClass is None:
-            self.database: Database[Page] = Database(Page, database_id=database_id, client=self.n_client)
-            self.ClassConstructor = Page
+            self.DataClass = Page
+            self.custom_data_class = False
         else:
-            self.database: Database[DataClass] = Database(DataClass, database_id=database_id, client=self.n_client)
-            self.ClassConstructor = DataClass
+            self.custom_data_class = True
+            self.DataClass = DataClass
 
-        # database_info: Dict[str, Any] = self.n_client.databases.retrieve(database_id=database_id)
-        # properties: Dict[str, Any] = database_info["properties"]
-        # self.properties = self.database.properties
-        # Check if the properties are already defined in the DataClass
+        if not issubclass(self.DataClass, NotionObject):
+            raise ValueError("DataClass must be a subclass of NotionObject.")
 
-        # for prop_name, prop_info in properties.items():
-        # if pr
+        self.database: Optional[Database[self.DataClass]] = None
+        self.properties: Dict[str, Any] = {}
         self.pages: List[NotionPage] = []
+        self.parent: Optional[NotionPage] = None
+
+        if self.database_id is not None:
+            self.load_database(database_id)
+
+    def set_parent(self, parent: NotionPage):
+        self.parent = parent
+
+    def set_parent_by_id(self, parent_id: str):
+        self.parent = NotionPage(token=self.token, page_id=parent_id, load=False)
+
+    def get_parent(self) -> NotionPage:
+        return self.parent
+
+    def get_parent_id(self) -> str:
+        return self.parent.page_id
+
+    def get_property_map(self, source_properties: List[str], threshold: int = 80) -> Dict[str, str]:
+        mappings = {}
+        db_prop_names = [prop["name"] for prop in self.get_properties().values()]
+
+        for src_property in source_properties:
+            best_match = None
+            best_score = 0
+            for prop in db_prop_names:
+                score = fuzz.ratio(src_property.lower(), prop.lower())
+                if score > best_score:
+                    best_score = score
+                    best_match = prop
+            if best_score > threshold:  # Threshold for fuzzy match
+                mappings[src_property] = best_match
+                db_prop_names.remove(best_match)
+
+        return mappings
+
+    def load_from_json(
+        self,
+        json_path: Union[str, Path],
+        database_id: str,
+        DataClass: Optional[NotionObject] = None,
+        create_properties: bool = False,
+        force: bool = False,
+    ):
+        self.database_id = database_id
+        self.DataClass = DataClass
+        self.load_database(database_id)
+
+        with Path.open(json_path) as f:
+            records: List[Dict[str, Any]] = json.load(f)
+
+        # filename = Path(json_path).stem
+        # print(filename)
+        record = records[0]
+        properties = record.keys()
+        # generate_model_class_code(filename, properties, file_path=None)
+
+        db_prop_names = [prop["name"].lower() for prop in self.get_properties().values()]
+        print(f"Database properties: {db_prop_names}")
+        properties_map = self.get_property_map(properties, threshold=80)
+        print(f"Property mappings: {properties_map}")
+        for prop in properties:
+            if prop in properties_map and properties_map[prop] in db_prop_names:
+                print(f"Mapping '{prop}' to '{properties_map[prop]}'")
+                continue
+            else:
+                logger.warning(f"Property '{prop}' not found in database properties.")
+                if create_properties:
+                    prop_type = "rich_text"
+                    if isinstance(record[prop], str):
+                        prop_type = "rich_text"
+                    elif isinstance(record[prop], int):
+                        prop_type = "number"
+                    elif isinstance(record[prop], bool):
+                        prop_type = "checkbox"
+                    elif isinstance(record[prop], datetime):
+                        prop_type = "date"
+                    elif isinstance(record[prop], list):
+                        prop_type = "multi_select"
+                    logger.info(f"Creating property '{prop}' with type '{prop_type}'")
+                    self.add_property(prop, prop_type)
+
+        for record in records:
+            update_record = {}
+            for prop, value in record.items():
+                if prop in properties_map:
+                    update_record[properties_map[prop]] = value
+                    print(f"Mapping '{prop}' to '{properties_map[prop]}'")
+                else:
+                    print(f"Property '{prop}' not found in database properties.")
+
+            if update_record:
+                print(f"Creating record: {update_record}")
+                self.create(update_record)
+
+    def load_database(self, database_id: str):
+        self.database_id = database_id
+
+        try:
+            self.database_info: Dict[str, Any] = self.n_client.client.databases.retrieve(database_id=database_id)
+            # "parent": {
+            # "type": "page_id",
+            # "page_id": "7f64948c-b0c0-46e4-95c4-fb7e93813488"
+            # },
+            # "parent": {
+            # "type": "workspace",
+            # "workspace": true
+            # },
+            # "parent": {
+            # "type": "block_id",
+            # "block_id": "1c8561b8-1d2e-41f5-b11c-f9f0d5096b16"
+            # },
+            parent_type = self.database_info["parent"]["type"]
+            if parent_type == "page_id":
+                self.parent = NotionPage(token=self.token, page_id=self.database_info["parent"][parent_type], load=False)
+        except Exception as e:
+            raise ValueError(f"Database with ID '{database_id}' not found.") from e
+
+        self.database: Database[self.DataClass] = Database(self.DataClass, database_id=database_id, client=self.n_client.client)
+
+        if self.database is None:
+            raise ValueError(f"Fail to load Database on valid ID '{database_id}'.")
+
+        self.properties = self.database_info["properties"]
+
         for page in self.database:
             self.pages.append(NotionPage(token=self.token, page_id=page.id, load=False))
 
-    # def fetch_database_properties(self) -> Dict[str, Any]:
+    def get_properties(self) -> Dict[str, Any]:
+        self.database_info: Dict[str, Any] = self.n_client.client.databases.retrieve(database_id=self.database_id)
+        self.properties = self.database_info["properties"]
+        return self.properties
+
+    # "Tasks": {
+    #     "id": "%3AVpi",
+    #     "name": "Tasks",
+    #     "type": "relation",
+    #     "relation": {
+    #         "database_id": "ac1f2415-2252-4961-b983-b28817e0ef7a",
+    #         "type": "single_property",
+    #         "single_property": {}
+    #     }
+    # },
+    def add_property(self, prop_name: str, prop_type: Optional[str] = "rich_text", prop_info: Optional[Dict[str, Any]] = None):
+        if prop_type not in DATABASE_PROPERTIES:
+            raise ValueError(f"Invalid property type '{prop_type}'.")
+        if prop_info is None:
+            prop_info = {}
+        properties_update = {
+            "type": prop_type,
+            prop_type: prop_info,
+        }
+        self.n_client.client.databases.update(self.database_id, properties={prop_name: properties_update})
+
+    def remove_property(self, prop_name: str):
+        try:
+            self.n_client.client.databases.update(self.database_id, properties={prop_name: None})
+        except Exception:
+            logger.error(f"Failed to remove property '{prop_name}' from database '{self.database_id}'.")
 
     def get_pages(self, force: bool = False) -> List[NotionPage]:
         """Get Pages."""
@@ -587,17 +777,37 @@ class NotionDatabase:
                 self.pages.append(NotionPage(token=self.n_client.token, page_id=page.id, load=False))
         return self.pages
 
+    # def new(self, parent: Optional[NotionPage] = None, **kwargs) -> NotionObject:
+    #     """Create a new Database Entry."""
+    #     if parent is None and self.parent is None:
+    #         raise ValueError("Parent NotionPage must be provided.")
+    #     if parent is None:
+    #         parent = self.parent
+    #     return self.database.new(parent=parent.page_id, **kwargs)
+
     def create(self, properties: Optional[Dict[str, Any]] = None, obj: Optional[NotionObject] = None) -> NotionObject:
         """Create Database Entry."""
         if properties is None and obj is None:
             raise ValueError("Either properties or obj must be provided.")
+        if properties is not None and obj is not None:
+            raise ValueError("Only one of properties or obj can be provided.")
+        # for prop_name, prop_info in properties.items():
+        #     if prop_name not in self.database.properties:
+        #         raise ValueError(f"Property '{prop_name}' not found in database properties.")
+
         if obj is not None:
             entry = obj
+        # elif isinstance(self.DataClass, DynamicNotionObject):
         else:
-            entry = self.ClassConstructor.new(**properties)
-        entry = self.database.create(entry)
-        self.pages.append(NotionPage(token=self.token, page_id=entry.id, load=False))
-        return entry
+            # entry = self.DataClass()
+            # for prop_name, prop_value in properties.items():
+            #     setattr(entry, prop_name, prop_value)
+
+            entry = self.DataClass.new(**properties)
+            print(f"Creating Entry: {entry}")
+        db_entry = self.database.create(entry)
+        self.pages.append(NotionPage(token=self.token, page_id=db_entry.id, load=False))
+        return db_entry
 
     def read(self, entry_id: str) -> NotionObject:
         """Read Database Entry."""
@@ -613,6 +823,7 @@ class NotionDatabase:
     def delete(self, entry: NotionObject):
         """Delete Database Entry."""
         self.n_client.client.blocks.delete(block_id=entry.id)
+        self.pages.remove(entry)
 
     def delete_all(self):
         """Remove Pages."""
@@ -622,6 +833,9 @@ class NotionDatabase:
 
     def __repr__(self):
         return f"NotionDatabase(title={self.database.title}, database_id={self.database.database_id})"
+
+    def __iter__(self):
+        return iter(self.database)
 
     def download_database(self, database_id: str, out_dir: Union[str, Path] = "./json"):
         """Download the notion database and associated pages."""

@@ -15,6 +15,7 @@ include tox.ini
 include AUTHORS.rst
 include CHANGELOG.rst
 include CONTRIBUTING.rst
+include VERSION
 include LICENSE
 include README.rst
 include requirements.txt
