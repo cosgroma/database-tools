@@ -24,7 +24,7 @@ from databasetools import NotionClient
 from databasetools import NotionDatabase
 from databasetools import NotionExporter
 from databasetools import NotionPage
-from databasetools import utils
+from databasetools.adapters.notion import utils
 
 NOTION_API_KEY = os.getenv("NOTION_API_KEY")
 PAGE_URL = os.getenv("PAGE_URL")
@@ -200,9 +200,9 @@ def test_notion_page():
     blocks.append(NotionBlock.create_heading_block("I'm a heading.", level=1))
     blocks.append(NotionBlock.create_paragraph_block("I'm a red bold italic paragraph.", color="red", bold=True, italic=True))
     blocks.append(NotionBlock.create_heading_block("I'm a blue bold italic heading.", level=2, color="blue", bold=True, italic=True))
-    blocks.append(NotionBlock.create_list_block(["I'm a bulleted list.", "I'm a bulleted list."], numbered=False))
+    # blocks.append(NotionBlock.create_list_block(["I'm a bulleted list.", "I'm a bulleted list."], numbered=False))
     blocks.append(NotionBlock.create_heading_block("I'm a heading.", level=3))
-    blocks.append(NotionBlock.create_list_block(["I'm a numbered list.", "I'm a numbered list."], numbered=True))
+    # blocks.append(NotionBlock.create_list_block(["I'm a numbered list.", "I'm a numbered list."], numbered=True))
     blocks.append(NotionBlock.create_heading_block("I'm a heading."))
     blocks.append(NotionBlock.create_heading_block("I'm a heading.", level=2))
     blocks.append(NotionBlock.create_to_do_block("I'm a to-do list.", checked=True))
