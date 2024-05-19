@@ -1,0 +1,80 @@
+site_name: Database Tools
+site_description: Database Tools Documentation
+site_url: http://pages/ngira
+theme:
+  name: "material"
+  palette:
+    - scheme: "default"
+      media: "(prefers-color-scheme: light)"
+      toggle:
+        icon: "material/lightbulb"
+        name: "Switch to dark mode"
+    - scheme: "slate"
+      media: "(prefers-color-scheme: dark)"
+      primary: "blue"
+      toggle:
+        icon: "material/lightbulb-outline"
+        name: "Switch to light mode"
+  features:
+    - navigation.sections
+
+repo_name: cosgroma/database-tools
+repo_url: https://github.com/cosgroma/database-tools
+edit_uri: ""
+
+plugins:
+  - search
+  - table-reader
+  - mkdocstrings:
+      handlers:
+        python:
+        rendering:
+          show_source: true
+
+nav:
+  - Introduction: "index.md"
+  - Usage:
+      - QuickStart: "usage/quickstart.md"
+      - Tutorial: "usage/tutorial.md"
+      - Users Guide: "usage/users-guide.md"
+      - Advanced Usage: "usage/advanced.md"
+  - Developer:
+      - Development Plan: "developer/dev-plan.md"
+      - Requirements: "developer/requirements.md"
+      - Design: "developer/design.md"
+      - Code: "developer/src.md"
+      - Unit Tests: developer/tests.md
+      - Troubleshooting: "developer/troubleshooting.md"
+      - Security: "developer/security.md"
+  - Integrators:
+      - Interface: "integrators/interface.md"
+      - API: "integrators/api.md"
+      - Exceptions: "integrators/exceptions.md"
+      - Environment Variables: "integrators/environment_variables.md"
+  - Community:
+      - Contributing: "community/contributing.md"
+      - Code of Conduct: "community/code-of-conduct.md"
+      - License: "community/license.md"
+      - Support: "community/support.md"
+      - Roadmap: "community/roadmap.md"
+      - Changelog: "community/changelog.md"
+      - Versioning: "community/versioning.md"
+      - Authors: "community/authors.md"
+      - Acknowledgements: "community/acknowledgements.md"
+
+markdown_extensions:
+  - admonition
+  - codehilite:
+      css_class: highlight
+  - mkautodoc
+  - toc:
+      permalink: true
+  - pymdownx.arithmatex
+  - pymdownx.betterem
+  - pymdownx.caret
+
+extra_css:
+  - "css/custom.css"
+
+extra_javascript:
+  - "js/sidecar-1.5.0.js"
