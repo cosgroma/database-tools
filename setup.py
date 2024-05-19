@@ -213,7 +213,7 @@ if __name__ == "__main__":
         },
         entry_points={
             "console_scripts": [
-                "dbman = databasetools.cli:run",
+                "db-man = databasetools.cli:run",
             ]
         },
     )

@@ -84,6 +84,13 @@ class LastEditedToDateTime(BaseTransformer):
     key_type = datetime
 
     def forward(self, blocks) -> List:
+        """Convert last_edited_time to datetime object.
+        Args:
+            blocks (List[dict]): List of blocks
+
+        Returns:
+            List: List of blocks with last_edited_time as datetime object
+        """
         key = self.key
         return [
             {
@@ -95,6 +102,12 @@ class LastEditedToDateTime(BaseTransformer):
         ]
 
     def reverse(self, o: Any) -> Union[None, str]:
+        """Convert datetime object to string.
+        Args:
+            o (Any): Object
+        Returns:
+            Union[None, str]: String representation of datetime object
+        """
         if isinstance(o, datetime):
             return o.isoformat() + "Z"
 
@@ -404,7 +417,7 @@ class NotionPage:
         self.file_path = self.local_dir / file_name
         self.file_type = self.file_path.suffix[1:]
 
-    def save(self, type: str = "json", file_name: Optional[str] = None) -> Path:
+    def save(self, type: str = "json", recursive: bool = False, file_name: Optional[str] = None, parent_name: Optional[str] = None):
         if self.page_id is None:
             raise ValueError("Page ID is not provided.")
         self.transformer = LastEditedToDateTime()
@@ -431,6 +444,9 @@ class NotionPage:
         # return {key: self.get_key(converter.json2md(value)) for key, value in post["properties"].items() if converter.json2md(value)}
         # markdown = JsonToMd(metadata).page2md(blocks)
         self.io.save(self.blocks, self.file_path)
+        if recursive:
+            for page in self.child_pages:
+                page.save(type=type, recursive=True)
 
         logger.info(f"Saved blocks to {self.file_path}")
         return self.file_path
@@ -591,6 +607,19 @@ DATABASE_PROPERTIES = {
     "name": {},
 }
 
+# "parent": {
+# "type": "page_id",
+# "page_id": "7f64948c-b0c0-46e4-95c4-fb7e93813488"
+# },
+# "parent": {
+# "type": "workspace",
+# "workspace": true
+# },
+# "parent": {
+# "type": "block_id",
+# "block_id": "1c8561b8-1d2e-41f5-b11c-f9f0d5096b16"
+# },
+
 
 class NotionDatabase:
     def __init__(self, token: str, database_id: Optional[str] = None, DataClass: Optional[NotionObject] = None):
@@ -710,18 +739,7 @@ class NotionDatabase:
 
         try:
             self.database_info: Dict[str, Any] = self.n_client.client.databases.retrieve(database_id=database_id)
-            # "parent": {
-            # "type": "page_id",
-            # "page_id": "7f64948c-b0c0-46e4-95c4-fb7e93813488"
-            # },
-            # "parent": {
-            # "type": "workspace",
-            # "workspace": true
-            # },
-            # "parent": {
-            # "type": "block_id",
-            # "block_id": "1c8561b8-1d2e-41f5-b11c-f9f0d5096b16"
-            # },
+
             parent_type = self.database_info["parent"]["type"]
             if parent_type == "page_id":
                 self.parent = NotionPage(token=self.token, page_id=self.database_info["parent"][parent_type], load=False)
@@ -784,6 +802,12 @@ class NotionDatabase:
     #     if parent is None:
     #         parent = self.parent
     #     return self.database.new(parent=parent.page_id, **kwargs)
+    def check_if_exists(self, title: str) -> bool:
+        """Check if Database Entry Exists."""
+        # return self.database.find_by_id(entry.id) is not None
+        for page in self.pages:
+            if page.title == title:
+                return True
 
     def create(self, properties: Optional[Dict[str, Any]] = None, obj: Optional[NotionObject] = None) -> NotionObject:
         """Create Database Entry."""
@@ -797,14 +821,15 @@ class NotionDatabase:
 
         if obj is not None:
             entry = obj
-        # elif isinstance(self.DataClass, DynamicNotionObject):
         else:
-            # entry = self.DataClass()
-            # for prop_name, prop_value in properties.items():
-            #     setattr(entry, prop_name, prop_value)
-
             entry = self.DataClass.new(**properties)
-            print(f"Creating Entry: {entry}")
+
+        # if self.check_if_exists(entry):
+        #     logger.warning(f"Entry '{entry.ref}' already exists in database.")
+        #     db_entry = next((page for page in self.pages if page.title == entry.ref), None)
+        #     return db_entry
+
+        print(f"Creating Entry: {entry}")
         db_entry = self.database.create(entry)
         self.pages.append(NotionPage(token=self.token, page_id=db_entry.id, load=False))
         return db_entry
@@ -837,6 +862,14 @@ class NotionDatabase:
     def __iter__(self):
         return iter(self.database)
 
+    def query(self, filter: Optional[dict] = None):
+        return self.database.query(filter=filter)
+
+    # def get_page_with_title(self, title: str) -> NotionPage:
+    #     for page in self.pages:
+    #         if page.title == title:
+    #             return page
+    #     return None
     def download_database(self, database_id: str, out_dir: Union[str, Path] = "./json"):
         """Download the notion database and associated pages."""
         # out_dir = Path(out_dir)

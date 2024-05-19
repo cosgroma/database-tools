@@ -11,6 +11,7 @@ from pathlib import Path
 
 import pytz
 from notion_objects import Checkbox
+from notion_objects import Date
 from notion_objects import MultiSelect
 from notion_objects import Number
 from notion_objects import Page
@@ -108,7 +109,7 @@ def test_exporter_export_page():
 
 def test_exporter_export_database():
     test_db_name = "test_db"
-    test_db_dir = f"output/{test_db_name}"
+    test_db_dir = Path(f"output/{test_db_name}")
     if Path.exists(test_db_dir):
         shutil.rmtree(test_db_dir)
     json_dir = f"{test_db_dir}/json"
@@ -280,15 +281,15 @@ class Task(Page):
 
 
 class Recording(Page):
-    ref_id = TitleText("ref_id")
+    ref = TitleText("Ref")
     file_path = Text("File Path")
     size_bytes = Number("Size Bytes")
     length_seconds = Number("Length Seconds")
-    # upload_date = Date("Upload Date")
+    upload_date = Date("Upload Date")
     processed = Checkbox("Processed")
 
     def __str__(self):
-        return f"Recording({self.ref_id}, {self.file_path}, {self.size_bytes})"
+        return f"Recording({self.ref}, {self.file_path}, {self.size_bytes})"
 
 
 def test_notion_database_class():
@@ -299,10 +300,23 @@ def test_notion_database_class():
     DB_ID = utils.extract_id_from_notion_url(DB_URL)
     # test_db = NotionDatabase(token=NOTION_API_KEY, database_id=DB_ID, DataClass=Task)
 
-    test_db = NotionDatabase(token=NOTION_API_KEY)
-    RECORDINGS_JSON = "tests\\recordings.json"
+    test_db = NotionDatabase(token=NOTION_API_KEY, database_id=DB_ID, DataClass=Recording)
 
-    test_db.load_from_json(RECORDINGS_JSON, DB_ID, Recording)
+    RECORDINGS_JSON = "tests\\recordings.json"
+    # Read records
+    with Path.open(RECORDINGS_JSON, "r") as f:
+        recordings = json.load(f)
+
+    # Save records to database
+    for recording in recordings:
+        recording["ref"] = recording["id"]
+        print(recording)
+        entry = Recording.new(**recording)
+        print(entry)
+        # test_db.read(entry)
+        test_db.create(obj=entry)
+        break
+    # test_db.load_from_json(RECORDINGS_JSON, DB_ID, Recording)
 
 
 def test_notion_database_properties():
