@@ -1,4 +1,4 @@
-from databasetools import utils
+from databasetools.adapters.notion import utils
 
 # def flatten_dict(data: Dict):
 # def is_time_string(s: str) -> bool:

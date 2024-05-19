@@ -1,0 +1,158 @@
+{
+    "Tasks": {
+        "id": "%3AVpi",
+        "name": "Tasks",
+        "type": "relation",
+        "relation": {
+            "database_id": "ac1f2415-2252-4961-b983-b28817e0ef7a",
+            "type": "single_property",
+            "single_property": {}
+        }
+    },
+    "Website": {
+        "id": "%3Cu_t",
+        "name": "Website",
+        "type": "url",
+        "url": {}
+    },
+    "ID": {
+        "id": "CGUn",
+        "name": "ID",
+        "type": "unique_id",
+        "unique_id": {
+            "prefix": "M4T"
+        }
+    },
+    "Created time": {
+        "id": "EEuz",
+        "name": "Created time",
+        "type": "created_time",
+        "created_time": {}
+    },
+    "Phone": {
+        "id": "TrWi",
+        "name": "Phone",
+        "type": "phone_number",
+        "phone_number": {}
+    },
+    "Button": {
+        "id": "X%3F%5Cu",
+        "name": "Button",
+        "type": "button",
+        "button": {}
+    },
+    "Tags": {
+        "id": "Y%3C%3CX",
+        "name": "Tags",
+        "type": "multi_select",
+        "multi_select": {
+            "options": [
+                {
+                    "id": "fef4d5ce-973f-4368-9904-18ae2489a8db",
+                    "name": "Test",
+                    "color": "brown",
+                    "description": null
+                },
+                {
+                    "id": "a7a74510-3da1-49bb-b510-b5375deaf391",
+                    "name": "Task",
+                    "color": "orange",
+                    "description": null
+                },
+                {
+                    "id": "167a9e75-108d-4ffd-ac80-32b21546b88e",
+                    "name": "Tags",
+                    "color": "blue",
+                    "description": null
+                }
+            ]
+        }
+    },
+    "Select": {
+        "id": "%60FR%5C",
+        "name": "Select",
+        "type": "select",
+        "select": {
+            "options": []
+        }
+    },
+    "Status": {
+        "id": "imf%7B",
+        "name": "Status",
+        "type": "status",
+        "status": {
+            "options": [
+                {
+                    "id": "b336d2ca-92f9-4386-9785-bb6b5c0d630d",
+                    "name": "Not started",
+                    "color": "default",
+                    "description": null
+                },
+                {
+                    "id": "3e6623d1-d5bc-46ef-a3b8-b8dc6ec18117",
+                    "name": "In progress",
+                    "color": "blue",
+                    "description": null
+                },
+                {
+                    "id": "3ffa976d-2477-4dcd-95d2-cf664331ed92",
+                    "name": "Done",
+                    "color": "green",
+                    "description": null
+                }
+            ],
+            "groups": [
+                {
+                    "id": "cd3392b5-0c0f-4b57-8b27-607229e12e75",
+                    "name": "To-do",
+                    "color": "gray",
+                    "option_ids": [
+                        "b336d2ca-92f9-4386-9785-bb6b5c0d630d"
+                    ]
+                },
+                {
+                    "id": "014be9e1-97a6-4def-b2fe-bbc8225d5116",
+                    "name": "In progress",
+                    "color": "blue",
+                    "option_ids": [
+                        "3e6623d1-d5bc-46ef-a3b8-b8dc6ec18117"
+                    ]
+                },
+                {
+                    "id": "d3266a76-615e-4109-8829-7a891a00833b",
+                    "name": "Complete",
+                    "color": "green",
+                    "option_ids": [
+                        "3ffa976d-2477-4dcd-95d2-cf664331ed92"
+                    ]
+                }
+            ]
+        }
+    },
+    "Attachments": {
+        "id": "jr%3CH",
+        "name": "Attachments",
+        "type": "files",
+        "files": {}
+    },
+    "Is Active": {
+        "id": "lVGp",
+        "name": "Is Active",
+        "type": "checkbox",
+        "checkbox": {}
+    },
+    "Quantity": {
+        "id": "sFM%5B",
+        "name": "Quantity",
+        "type": "number",
+        "number": {
+            "format": "number"
+        }
+    },
+    "Name": {
+        "id": "title",
+        "name": "Name",
+        "type": "title",
+        "title": {}
+    }
+}

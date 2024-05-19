@@ -2,22 +2,14 @@ __version__ = "0.0.0"
 
 from dotenv import load_dotenv
 
-from .json2md import JsonToMdConverter
-
-# from .notion import NotionIO
-from .notion import NotionClient
-from .notion import NotionDatabase
-from .notion import NotionDownloader
-from .notion import NotionExporter
-from .notion import NotionPage
+from .adapters.notion import JsonToMdConverter
+from .adapters.notion import NotionBlock
+from .adapters.notion import NotionClient
+from .adapters.notion import NotionDatabase
+from .adapters.notion import NotionDownloader
+from .adapters.notion import NotionExporter
+from .adapters.notion import NotionPage
 
 load_dotenv()  # take environment variables
 
-__all__ = [
-    "JsonToMdConverter",
-    "NotionDownloader",
-    "NotionExporter",
-    "NotionClient",
-    "NotionPage",
-    "NotionDatabase",
-]
+__all__ = ["JsonToMdConverter", "NotionClient", "NotionDatabase", "NotionPage", "NotionDownloader", "NotionExporter", "NotionBlock"]

@@ -19,7 +19,7 @@ from notion_objects import Status
 from notion_objects import Text
 from notion_objects import TitleText
 
-import databasetools.block as NotionBlock
+from databasetools import NotionBlock
 from databasetools import NotionClient
 from databasetools import NotionDatabase
 from databasetools import NotionExporter
