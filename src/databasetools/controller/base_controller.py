@@ -9,11 +9,14 @@ from typing import Any
 from typing import Dict
 from typing import Generic
 from typing import List
+from typing import Optional
 from typing import Type
 from typing import TypeVar
 
 from pydantic import BaseModel
+from pydantic import ValidationError
 from pymongo.collection import Collection
+from pymongo.errors import PyMongoError
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -59,25 +62,20 @@ class GenericController(Generic[T]):
         Returns:
             T: The created document as a Pydantic model instance.
         """
-        document = self.model(**document_data)
-        self.collection.insert_one(document_data)
-        return document
+        try:
+            document = self.model(**document_data)
+            self.collection.insert_one(document.dict(by_alias=True))
+            return document
+        except ValidationError as e:
+            # Handle validation errors
+            print(f"Validation error: {e}")
+            raise
+        except PyMongoError as e:
+            # Handle MongoDB errors
+            print(f"Database error: {e}")
+            raise
 
-    # def create(self, document: T) -> T:
-    #     """
-    #     Creates a new document in the collection.
-
-    #     Parameters:
-    #         document (T): The document to create.
-
-    #     Returns:
-    #         T: The created document as a Pydantic model instance.
-    #     """
-    #     document_data = document.model_dump()
-    #     self.collection.insert_one(document_data)
-    #     return document
-
-    def read(self, query: Dict[str, Any]) -> List[T]:
+    def read(self, query: Dict[str, Any], limit: Optional[int] = None) -> List[T]:
         """
         Reads documents from the collection.
 
@@ -87,8 +85,15 @@ class GenericController(Generic[T]):
         Returns:
             List[T]: A list of document instances as Pydantic model objects.
         """
-        documents = self.collection.find(query)
-        return [self.model(**doc) for doc in documents]
+        try:
+            documents = self.collection.find(query).limit(limit) if limit else self.collection.find(query)
+            return [self.model(**doc) for doc in documents]
+        except ValidationError as e:
+            raise ValidationError(f"Validation error: {e}") from e
+        except PyMongoError as e:
+            raise PyMongoError(f"Database error: {e}") from e
+        except Exception as e:
+            raise Exception(f"Error: {e}") from e
 
     def update(self, query: Dict[str, Any], update_data: Dict[str, Any]) -> bool:
         """

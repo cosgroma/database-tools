@@ -1,0 +1,178 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Generated schema for Root",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "properties": {
+      "title": {
+        "type": "string"
+      },
+      "create_time": {
+        "type": "number"
+      },
+      "update_time": {
+        "type": "number"
+      },
+      "mapping": {
+        "type": "object",
+        "properties": {
+          "9e0a1b09-30ad-4a8e-8291-6c94d160dc60": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "message": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "author": {
+                    "type": "object",
+                    "properties": {
+                      "role": {
+                        "type": "string"
+                      },
+                      "name": {},
+                      "metadata": {
+                        "type": "object",
+                        "properties": {},
+                        "required": []
+                      }
+                    },
+                    "required": [
+                      "role",
+                      "name",
+                      "metadata"
+                    ]
+                  },
+                  "create_time": {},
+                  "update_time": {},
+                  "content": {
+                    "type": "object",
+                    "properties": {
+                      "content_type": {
+                        "type": "string"
+                      },
+                      "parts": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "required": [
+                      "content_type",
+                      "parts"
+                    ]
+                  },
+                  "status": {
+                    "type": "string"
+                  },
+                  "end_turn": {
+                    "type": "boolean"
+                  },
+                  "weight": {
+                    "type": "number"
+                  },
+                  "metadata": {
+                    "type": "object",
+                    "properties": {
+                      "is_visually_hidden_from_conversation": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "is_visually_hidden_from_conversation"
+                    ]
+                  },
+                  "recipient": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "author",
+                  "create_time",
+                  "update_time",
+                  "content",
+                  "status",
+                  "end_turn",
+                  "weight",
+                  "metadata",
+                  "recipient"
+                ]
+              },
+              "parent": {
+                "type": "string"
+              },
+              "children": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "id",
+              "message",
+              "parent",
+              "children"
+            ]
+          }
+        },
+        "required": []
+      },
+      "moderation_results": {
+        "type": "array",
+        "items": {}
+      },
+      "current_node": {
+        "type": "string"
+      },
+      "plugin_ids": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "conversation_id": {
+        "type": "string"
+      },
+      "conversation_template_id": {
+        "type": "string"
+      },
+      "gizmo_id": {
+        "type": "string"
+      },
+      "is_archived": {
+        "type": "boolean"
+      },
+      "safe_urls": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "default_model_slug": {
+        "type": "string"
+      },
+      "id": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "create_time",
+      "update_time",
+      "mapping",
+      "moderation_results",
+      "current_node",
+      "conversation_id",
+      "is_archived",
+      "safe_urls",
+      "id"
+    ]
+  }
+}
