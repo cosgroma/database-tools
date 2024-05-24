@@ -1,5 +1,30 @@
 # Development Plan
 
+## Background
+
+### **General Steps of the Arcadia Method**
+
+The Arcadia method, developed by Thales Group, is a model-based systems engineering (MBSE) approach that provides a structured methodology for system and software engineering. It emphasizes the use of models to capture and analyze system requirements, architecture, and design. The Arcadia method consists of several key steps, including operational analysis, system need analysis, logical and physical architecture design, component design, and validation and verification.
+
+1. **Operational Analysis**:
+    - Understand and analyze the operational needs and environment.
+    - Define the operational scenarios and use cases.
+2. **System Need Analysis**:
+    - Identify and define system requirements based on operational needs.
+    - Develop a functional analysis to understand the system's functionality.
+3. **Logical Architecture**:
+    - Define the logical architecture, focusing on how the system should be structured to meet requirements.
+    - Model the logical components and their interactions.
+4. **Physical Architecture**:
+    - Develop the physical architecture, specifying the actual implementation.
+    - Map logical components to physical components.
+5. **Component Design**:
+    - Detail the design of individual components.
+    - Specify the interfaces and interactions between components.
+6. **Validation and Verification**:
+    - Validate the architecture and design against requirements.
+    - Verify that the system meets the operational needs and performance criteria.
+
 ## Command Line Design
 
 ```bash
@@ -204,4 +229,35 @@ attachment = Attachment(confluence, page=page, file_path="FILE_PATH")
 
 page.create()
 attachment.upload()
+```
+
+### Trasncription
+
+```python
+def get_topic_extraction_prompt(self, transcription: str):
+        MODEL_MAX_TOKENS = 8192
+        token_count = num_tokens_from_string(transcription)
+        if token_count > MODEL_MAX_TOKENS:
+            logger.error(f"Transcription too long for model: {len(transcription)} characters, {token_count} tokens")
+            return None
+        return f"Extract the main topics from the following transcription:\n\n{transcription}\n\n"
+
+def get_topics(self):
+    logger.info("Getting topics for transcriptions")
+    for idx, tr in enumerate(self.transcription_records):
+        if "topics" in tr:
+            logger.info(f"Skipping transcription {tr['id']} because it already has topics")
+            continue
+        transcription = tr["transcription"]
+        prompt = self.get_topic_extraction_prompt(transcription)
+        history = [
+            {"role": "system", "content": "You are an intelligent assistant. You always provide well-reasoned answers that are both correct and helpful."},
+            {"role": "user", "content": prompt},
+        ]
+        if not prompt:
+            logger.error(f"Skipping transcription {tr['id']} because it is too long")
+            return None
+        topics = get_chat_completion(history)
+        self.transcription_records[idx]["topics"] = topics["content"]
+        self.save()
 ```

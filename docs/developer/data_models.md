@@ -1,6 +1,15 @@
 # Data Models
 
-## Conversation Model
+## **Benefits of Using Pydantic**
+
+1. **Validation**: Pydantic will automatically validate the data types and structure of your JSON data, catching errors early.
+2. **Serialization/Deserialization**: Easily convert between JSON and Python objects.
+3. **Clarity**: Clear and explicit data models make the code easier to understand and maintain.
+4. **Error Handling**: Validation errors are explicit and informative, helping you debug issues effectively.
+
+## App Models
+
+### Conversation Model
 
 ```plantuml
 @startuml

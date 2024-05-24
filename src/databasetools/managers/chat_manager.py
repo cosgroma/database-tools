@@ -3,7 +3,6 @@ from pathlib import Path
 from typing import Any
 from typing import Dict
 from typing import List
-from typing import Tuple
 
 from pydantic import ValidationError
 from pymongo import MongoClient
@@ -46,7 +45,7 @@ class ChatManager:
         try:
             role = message.author.role
             content = message.content
-            content_str = "".join([part["text"] for part in content.parts])
+            content_str = "".join(content.parts)
             return {"role": role, "content": content_str}
         except Exception as e:
             print(f"Error getting content: {e} {message}")
@@ -86,21 +85,17 @@ class ChatManager:
             except ValidationError as e:
                 print(f"Validation error: {e}")
 
-    def clear_conversation_summaries(self):
-        conversations = list(self.conversations_collection.find())
-        for conv_dict in conversations:
-            conversation = Conversation(**conv_dict)
-            conversation.summary = None
-            self.conversations_collection.update_one({"id": conversation.id}, {"$set": conversation.dict()}, upsert=True)
-
-    def get_summary_and_tags(self, conversation: Conversation) -> Tuple[str, List[str]]:
-        # Implement this method based on your specific requirements
-        return "Summary", []
-
     def load_conversations(self, file_path: str) -> List[Conversation]:
         with Path.open(file_path) as file:
             data = json.load(file)
-        return [Conversation(**conv) for conv in data]
+            conversations = []
+            for conv in data:
+                try:
+                    conversation = Conversation(**conv)
+                    conversations.append(conversation)
+                except Exception as e:
+                    print(f"Error: {e} for conversation: {conv['title']}")
+        return conversations
 
 
 # Example usage:
