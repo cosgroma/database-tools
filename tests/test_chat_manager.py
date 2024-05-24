@@ -1,4 +1,6 @@
 import unittest
+from typing import Any
+from typing import Dict
 from unittest.mock import patch
 
 import mongomock
@@ -89,16 +91,31 @@ class TestChatManager(unittest.TestCase):
     def test_load_conversations(self):
         conversations = self.manager.load_conversations("tests/test_data/conversations.json")
         assert len(conversations) == 10
-        # "title": "Comfy UI for diffusion.",
-        # "title": "Avoid Conversion Char Star",
-        # "title": "CMake Issue Detection",
-        # "title": "Python code similarity search",
-        # "title": "Notion Content Management Tool",
-        # "title": "Docker Swarm App Deployment",
-        # "title": "User request, assistant summarize.",
-        # "title": "Enhance Navigation Accuracy",
-        # "title": "Python App Discussion",
-        # "title": "List Implementation Analysis",
+        TITLE_LIST = [
+            "Comfy UI for diffusion.",
+            "Avoid Conversion Char Star",
+            "CMake Issue Detection",
+            "Python code similarity search",
+            "Notion Content Management Tool",
+            "Docker Swarm App Deployment",
+            "User request, assistant summarize.",
+            "Enhance Navigation Accuracy",
+            "Python App Discussion",
+            "List Implementation Analysis",
+        ]
+        for i, conv in enumerate(conversations):
+            assert conv.title == TITLE_LIST[i]
+            print(conv)
+            conversation_records: Dict[str, Dict[str, Any]] = {}
+            conversation_records[conv.id] = conv.to_records()
+
+        for records in conversation_records.values():
+            for message in records:
+                assert message.role in ["user", "assistant", "system", "unknown", "tool"]
+
+        assert self.manager.upload_to_mongo(conversations) == 10
+        assert self.manager.upload_to_mongo(conversations) == 0
+        assert self.manager.upload_to_mongo(conversations, overwrite=True) == 10
 
     def tearDown(self):
         # Clear the test database after each test

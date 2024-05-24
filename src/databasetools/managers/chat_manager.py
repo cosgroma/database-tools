@@ -4,7 +4,6 @@ from typing import Any
 from typing import Dict
 from typing import List
 
-from pydantic import ValidationError
 from pymongo import MongoClient
 
 from ..models.conversation_model import Conversation
@@ -69,21 +68,29 @@ class ChatManager:
 
         return conversation
 
-    def upload_to_mongo(self, conversations: List[Conversation]):
+    def upload_to_mongo(self, conversations: List[Conversation], overwrite: bool = False) -> int:
+        uploaded = 0
         # check that the conversation doesn't already exist in the collection
-
         for conversation in conversations:
+            if len(list(self.conversations_collection.find({"id": conversation.id}))) > 0:
+                if not overwrite:
+                    print(f"Conversation {conversation.id} already exists in the collection, skipping, add overwrite=True to overwrite")
+                    continue
+                else:
+                    print(f"Overwriting conversation {conversation.id}")
             self.conversations_collection.update_one({"id": conversation.id}, {"$set": conversation.model_dump()}, upsert=True)
+            uploaded += 1
+        return uploaded
 
-    def process_mongo_conversations(self):
-        conversations = list(self.conversations_collection.find())
-        for conv_dict in conversations:
-            try:
-                conversation = Conversation(**conv_dict)
-                conversation_update = self.process_conversation(conversation)
-                self.conversations_collection.update_one({"id": conversation.id}, {"$set": conversation_update.model_dump()}, upsert=True)
-            except ValidationError as e:
-                print(f"Validation error: {e}")
+    # def process_mongo_conversations(self):
+    #     conversations = list(self.conversations_collection.find())
+    #     for conv_dict in conversations:
+    #         try:
+    #             conversation = Conversation(**conv_dict)
+    #             conversation_update = self.process_conversation(conversation)
+    #             self.conversations_collection.update_one({"id": conversation.id}, {"$set": conversation_update.model_dump()}, upsert=True)
+    #         except ValidationError as e:
+    #             print(f"Validation error: {e}")
 
     def load_conversations(self, file_path: str) -> List[Conversation]:
         with Path.open(file_path) as file:

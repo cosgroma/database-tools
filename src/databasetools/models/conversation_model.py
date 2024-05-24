@@ -28,6 +28,9 @@ class TextContent(BaseModel):
     content_type: str = "text"
     parts: List[str]
 
+    def __str__(self):
+        return " ".join(self.parts)
+
 
 # {
 #     "content_type": "code",
@@ -40,6 +43,9 @@ class CodeContent(BaseModel):
     language: Optional[str] = "unknown"
     response_format_name: Optional[str] = None
     text: Optional[str] = None
+
+    def __str__(self):
+        return f"```{self.language}\n{self.text}\n```"
 
 
 # {
@@ -91,6 +97,9 @@ class ExecutionOutputContent(BaseModel):
     content_type: str = "execution_output"
     text: Optional[str]
 
+    def __str__(self):
+        return self.text
+
 
 # {
 #     "role": "user",
@@ -101,6 +110,9 @@ class Author(BaseModel):
     role: str
     name: Optional[str] = None
     metadata: Optional[Dict[str, Any]] = None
+
+    def __str__(self):
+        return self.role
 
 
 # {
@@ -161,6 +173,25 @@ class Message(BaseModel):
         validate_content_type(value.content_type, value.model_dump())
         return value
 
+    def __str__(self):
+        return f"[{self.author.role}, {self.weight}]: {self.content:20}"
+
+
+class SimpleMessage(BaseModel):
+    role: str
+    content: str
+
+    def __str__(self):
+        return f"{self.role}: {self.content:20}..."
+
+    @classmethod
+    def from_message(cls, message: Message) -> "SimpleMessage":
+        if message is None:
+            return cls(role="unknown", content="")
+        content = str(message.content) if message.content is not None else ""
+        role = message.author.role if message.author is not None else "unknown"
+        return cls(role=role, content=content)
+
 
 # {
 # "aaa23f00-9117-4700-85fd-e4be81fdf783": {
@@ -193,6 +224,9 @@ class Mapping(BaseModel):
     children: Optional[List[str]]
     message: Optional[Message]
 
+    def __str__(self):
+        return f"[{self.parent:5}]{self.id:5} -> {self.message:20}..."
+
 
 # {
 # "conversation_id": "9bb26374-a22f-4158-923f-5b66f80aa885",
@@ -223,7 +257,16 @@ class Conversation(BaseModel):
     plugin_ids: Optional[List[str]]
     safe_urls: Optional[List[str]]
     mapping: Dict[str, Mapping]
-    # message_set: Optional[List[Dict[str, Any]]] = None
+
+    def __str__(self):
+        return f"[{self.default_model_slug}]: {self.title} -- {self.id:10}"
+
+    def to_records(self) -> List[SimpleMessage]:
+        records = []
+        for mapping in self.mapping.values():
+            records.append(SimpleMessage.from_message(mapping.message))
+        return records
+
     # summary: Optional[str] = None
     # @field_validator('mapping')
     # def validate_mapping(cls, value):
