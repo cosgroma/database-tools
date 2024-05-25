@@ -1,3 +1,4 @@
+import os
 import unittest
 from typing import Any
 from typing import Dict
@@ -12,8 +13,7 @@ from databasetools.models.conversation_model import Mapping
 from databasetools.models.conversation_model import Message
 from databasetools.models.conversation_model import TextContent
 
-MONGO_URI = "mongodb://root:example@sergeant.work:28017/?tls=true&authSource=admin&readPreference=primary&directConnection=true"
-
+MONGO_URI = os.getenv("MONGO_URI")
 # Example usage:
 # manager = ChatManager(db_uri="mongodb://192.168.50.49:27017", db_name="chatgpt_db_test")
 # conversations = manager.load_conversations('path_to_file.json')
