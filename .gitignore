@@ -76,3 +76,4 @@ docs/_build
 sandbox/**
 output/**
 # src/databasetools/version.py
+**/version.py
