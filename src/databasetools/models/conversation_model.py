@@ -245,17 +245,17 @@ class Mapping(BaseModel):
 # },
 class Conversation(BaseModel):
     id: str
-    title: str
-    default_model_slug: str
     conversation_id: str
-    conversation_template_id: Optional[str]
-    gizmo_id: Optional[str]
+    title: Optional[str] = "No Title"
+    conversation_template_id: Optional[str] = None
+    default_model_slug: Optional[str] = "gpt-unk"
+    gizmo_id: Optional[str] = None
     create_time: float
     update_time: float
     current_node: Optional[str]
     moderation_results: Optional[List[Any]]
-    plugin_ids: Optional[List[str]]
-    safe_urls: Optional[List[str]]
+    plugin_ids: Optional[List[str]] = None
+    safe_urls: Optional[List[str]] = None
     mapping: Dict[str, Mapping]
 
     def __str__(self):
