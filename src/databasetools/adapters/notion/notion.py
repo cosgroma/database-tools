@@ -423,7 +423,7 @@ class NotionPage:
         self.transformer = LastEditedToDateTime()
         self.io = NotionIO(self.transformer)
         metadata = self.n_client.get_metadata(self.page_id)
-        metadata_filename = self.local_dir / "metadata.json"
+        metadata_filename = self.local_dir / "page_metadata.json"
         self.io.save([metadata], metadata_filename)
         logger.info(f"Saved metadata to {metadata_filename}")
 
@@ -862,8 +862,14 @@ class NotionDatabase:
     def __iter__(self):
         return iter(self.database)
 
-    def query(self, filter: Optional[dict] = None):
-        return self.database.query(filter=filter)
+    def query(self, filter: Optional[dict] = None) -> List[NotionObject]:
+        results = self.database.query(filter=filter)
+        pages: List[NotionPage] = []
+        for result in results:
+            if isinstance(result, dict):
+                pages.append(NotionPage(token=self.token, page_id=result["id"], load=False))
+            else:
+                print(f"result not dict: {type(result)}")
 
     # def get_page_with_title(self, title: str) -> NotionPage:
     #     for page in self.pages:

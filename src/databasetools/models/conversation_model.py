@@ -1,3 +1,24 @@
+"""Data Model for OpenAI Conversation
+
+The data model for the OpenAI conversation is defined in this module. The data model includes the following classes:
+
+- TextContent: A class representing text content.
+- CodeContent: A class representing code content.
+- ImageContent: A class representing image content.
+- MultimodalTextContent: A class representing multimodal text content.
+- ExecutionOutputContent: A class representing execution output content.
+
+The data model also includes the following classes:
+
+- Author: A class representing the author of a message.
+- Message: A class representing a message in a conversation.
+- SimpleMessage: A class representing a simplified version of a message.
+- Mapping: A class representing the mapping of messages in a conversation.
+- Conversation: A class representing a conversation.
+
+The data model is used to define the structure of the data that is stored and processed in the OpenAI conversation.
+"""
+
 from typing import Any
 from typing import Dict
 from typing import List
@@ -7,23 +28,7 @@ from typing import Union
 from pydantic import BaseModel
 from pydantic import field_validator
 
-# "content_type": "code",
 
-
-class MessageContent(BaseModel):
-    content_type: str
-    parts: Optional[List[str] | List[Dict[str, Any]]] = None
-    language: Optional[str] = None
-    response_format_name: Optional[str] = None
-    text: Optional[str] = None
-
-
-# {
-#     "content_type": "text",
-#     "parts": [
-#         "example text"
-#     ]
-# },
 class TextContent(BaseModel):
     content_type: str = "text"
     parts: List[str]
@@ -36,7 +41,7 @@ class TextContent(BaseModel):
 #     "content_type": "code",
 #     "language": "unknown",
 #     "response_format_name": null,
-#     "text": "import markdown\n\ncontent = \"\"\"\n# App Design Summary\n\n## Key Concepts and Objectives\n\nThe app is designed to support flow-based programming and system modeling, leveraging the four pillars of SysML (Requirements, Behavior, Structure, and Parametrics) and the Unified Architecture Framework (UAF). Additionally, it integrates the OODA (Observe, Orient, Decide, Act) loop for structured decision-making processes.\n\n## Primary Swim Lanes\n\n1. **Requirements**: Capture and organize system requirements.\n2. **Behavior**: Model the dynamic behavior of the system.\n3. **Structure**: Define the static structure of the system.\n4. **Parametrics**: Model performance constraints and quantitative relationships.\n\n## Key Features\n\n1. **Viewpoint Configuration**: Allow users to define and configure viewpoints dynamically.\n2. **Flexible Swim Lanes**: Enable the app to adapt to different swim lane structures based on the chosen viewpoint.\n3. **Node Abstraction**: Design nodes to be flexible and reusable across different viewpoints.\n\n## Node Types\n\n### Requirements Swim Lane\n- **Requirement Node**: Captures a specific requirement.\n- **Requirement Aggregation Node**: Aggregates multiple requirements.\n- **LLM Interaction Node**: Refines and generates requirements using an LLM.\n- **Traceability Node**: Links requirements to subsequent models for traceability.\n\n### Behavior Swim Lane\n- **Activity Node**: Represents actions or processes.\n- **State Machine Node**: Models state transitions.\n- **Use Case Node**: Defines scenarios and interactions.\n- **Sequence Diagram Node**: Captures the order of interactions.\n- **LLM Interaction Node**: Generates behavior models from requirements.\n- **Validation Node**: Ensures behaviors meet requirements.\n\n### Structure Swim Lane\n- **Component Node**: Represents system components.\n- **Connection Node**: Defines relationships between components.\n- **Subsystem Node**: Groups related components.\n- **Interface Node**: Details how components interact.\n- **LLM Interaction Node**: Assists in generating structural models.\n- **Configuration Node**: Manages component configurations.\n\n### Parametrics Swim Lane\n- **Parameter Node**: Defines key parameters and constraints.\n- **Relationship Node**: Models quantitative relationships between parameters.\n- **Optimization Node**: Assists in optimizing parameters to meet constraints.\n- **Simulation Node**: Runs simulations to test parametric models.\n- **LLM Interaction Node**: Helps define and refine parametric models.\n- **Metrics Node**: Tracks performance metrics and criteria.\n\n## OODA Loop Integration\n\n### Observe Phase\n- **Data Fetching Nodes**: Retrieve data from databases, APIs, or other sources.\n- **Contextual Information Nodes**: Gather additional context or environmental information.\n\n### Orient Phase\n- **Data Processing Nodes**: Process, clean, and transform raw data.\n- **Correlation Nodes**: Find relationships and patterns within the data.\n- **Visualization Nodes**: Create visual representations of data for better understanding.\n\n### Decide Phase\n- **Decision Support Nodes**: Evaluate options based on criteria and constraints.\n- **Optimization Nodes**: Optimize potential actions based on performance metrics.\n\n### Act Phase\n- **Action Nodes**: Execute specific actions or commands.\n- **Execution Monitoring Nodes**: Monitor the execution of actions and report outcomes.\n\n## Additional Flow Graphs\n\n### Sprint Planning Flow\n1. **Fetch Issues**\n2. **Prioritize Issues**\n3. **Define Sprint Goals**\n4. **Assign Tasks**\n5. **Create Sprint in JIRA**\n\n### Story Generation Flow\n1. **Gather Requirements**\n2. **Generate User Stories**\n3. **Review and Refine Stories**\n4. **Create Stories in JIRA**\n\n### Program Increment Planning Flow\n1. **Fetch Epics**\n2. **Define Increment Goals**\n3. **Align Teams**\n4. **Create Increment in JIRA**\n\n### Task Assignment and Tracking Flow\n1. **Fetch Backlog**\n2. **Assign Tasks**\n3. **Track Progress**\n4. **Update Task Status in JIRA**\n\n### Progress Monitoring and Reporting Flow\n1. **Fetch Sprint Data**\n2. **Analyze Progress**\n3. **Generate Reports**\n4. **Distribute Reports**\n\n## Key Design Decisions\n\n1. **Viewpoint Flexibility**: The app is designed to accept different viewpoint specifications, allowing for flexible swim lane construction.\n2. **Integration with JIRA**: Supports sprint planning, story generation, and program increment planning through seamless integration with JIRA.\n3. **OODA Loop Integration**: Incorporates the OODA loop to guide states and interactions within the system.\n4. **Node Flexibility and Reusability**: Nodes are designed to be flexible and reusable across different viewpoints and swim lanes.\n5. **Real-time Collaboration and Version Control**: Supports real-time collaboration and version control to enhance productivity and team collaboration.\n\nBy implementing these features, the app aims to provide a comprehensive and adaptable environment for system modeling and flow-based programming, supporting various methodologies like SysML and UAF.\n\n\"\"\"\n\nwith open(\"/mnt/data/App_Design_Summary.md\", \"w\") as file:\n    file.write(content)\n\n\"/mnt/data/App_Design_Summary.md\""
+#     "text": "import markdown"
 # },
 class CodeContent(BaseModel):
     content_type: str = "code"
@@ -67,8 +72,6 @@ class CodeContent(BaseModel):
 #         "sanitized": false
 #     }
 # }
-
-
 class ImageContent(BaseModel):
     content_type: str = "image_asset_pointer"
     asset_pointer: str
@@ -80,17 +83,14 @@ class ImageContent(BaseModel):
 
 # {
 # "content_type": "multimodal_text",
-# "parts": [
-# ]
+# "parts": []
 class MultimodalTextContent(BaseModel):
     content_type: str = "multimodal_text"
     parts: Optional[List[Dict[str, Any]]]
 
 
-# {
-#     "content_type": "execution_output",
-#     "text": "'/mnt/data/App_Design_Summary.md'"
-# },
+# "content_type": "execution_output",
+# "text": "'/mnt/data/App_Design_Summary.md'"
 
 
 class ExecutionOutputContent(BaseModel):
@@ -99,6 +99,25 @@ class ExecutionOutputContent(BaseModel):
 
     def __str__(self):
         return self.text
+
+
+ACCEPTABLE_CONTENT_TYPES = ["code", "execution_output", "text"]
+REQUIRED_ATTRIBUTES = {
+    "text": ["parts"],
+    "code": ["language", "text"],
+    "multimodal_text": ["parts"],
+    "execution_output": ["text"],
+}
+
+
+def validate_content_type(content_type: str, content: Dict[str, Any]):
+    if content_type not in ACCEPTABLE_CONTENT_TYPES:
+        print(f"Invalid content type: {content_type} skipping validation")
+        return
+    if content_type in REQUIRED_ATTRIBUTES:
+        for attr in REQUIRED_ATTRIBUTES[content_type]:
+            if attr not in content:
+                raise ValueError(f"Content type {content_type} requires attribute {attr} has {content}")
 
 
 # {
@@ -132,27 +151,6 @@ class Author(BaseModel):
 #     },
 #     "recipient": "all"
 # },
-
-
-# "content_type": "multimodal_text",
-# "content_type": "text",
-ACCEPTABLE_CONTENT_TYPES = ["code", "execution_output", "text"]
-REQUIRED_ATTRIBUTES = {
-    "text": ["parts"],
-    "code": ["language", "text"],
-    "multimodal_text": ["parts"],
-    "execution_output": ["text"],
-}
-
-
-def validate_content_type(content_type: str, content: Dict[str, Any]):
-    if content_type not in ACCEPTABLE_CONTENT_TYPES:
-        print(f"Invalid content type: {content_type} skipping validation")
-        return
-    if content_type in REQUIRED_ATTRIBUTES:
-        for attr in REQUIRED_ATTRIBUTES[content_type]:
-            if attr not in content:
-                raise ValueError(f"Content type {content_type} requires attribute {attr} has {content}")
 
 
 class Message(BaseModel):
@@ -217,7 +215,6 @@ class SimpleMessage(BaseModel):
 # "children": []
 # }
 # },
-# }
 class Mapping(BaseModel):
     id: str
     parent: Optional[str]
