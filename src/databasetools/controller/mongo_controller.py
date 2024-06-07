@@ -114,3 +114,15 @@ class GenericController(DatabaseController[T]):
         """
         result = self.collection.delete_many(query)
         return result.deleted_count > 0
+
+    def __iter__(self):
+        return self.collection.find()
+
+    def __next__(self):
+        return next(self.collection.find())
+
+    def __len__(self):
+        return self.collection.count_documents({})
+
+    def __repr__(self):
+        return f"GenericController(collection={self.collection}, model={self.model})"

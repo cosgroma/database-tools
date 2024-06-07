@@ -208,7 +208,7 @@ class NotionClient:
         """
         return self.transformer.forward([self.client.pages.retrieve(page_id=page_id)])[0]
 
-    def get_recent_pages(self) -> List[Dict[str, Any]]:
+    def get_recent_pages(self, query: Optional[str] = None) -> List[Dict[str, Any]]:
         """Get Recent Pages via Search Query.
 
         Returns:
@@ -224,25 +224,9 @@ class NotionClient:
                 "timestamp": "last_edited_time",
             },
         }
-        return self.client.search(**payload).get("results")
+        if query:
+            payload["query"] = query
 
-    def get_recent_projects(self) -> List[Dict[str, Any]]:
-        """Get Recent Projects via Search Query.
-
-        Returns:
-            List[Dict[str, Any]]: List of Recent Projects
-        """
-        payload = {
-            "query": "project",
-            "filter": {
-                "value": "page",
-                "property": "object",
-            },
-            "sort": {
-                "direction": "descending",
-                "timestamp": "last_edited_time",
-            },
-        }
         return self.client.search(**payload).get("results")
 
     def get_blocks(self, block_id: int) -> List:
@@ -257,8 +241,12 @@ class NotionClient:
         blocks = []
         results = paginate(self.client.blocks.children.list, block_id=block_id)
         for child in results:
-            child["children"] = list(self.get_blocks(child["id"])) if child["has_children"] else []
-            blocks.append(child)
+            try:
+                child["children"] = list(self.get_blocks(child["id"])) if child["has_children"] else []
+                blocks.append(child)
+            except Exception as e:
+                logger.error(f"Error: {e}")
+
         return list(self.transformer.forward(blocks))
 
     def get_database(self, database_id: str) -> List:
@@ -380,7 +368,9 @@ class NotionExporter:
 
 
 class NotionPage:
-    def __init__(self, token: str, page_id: Optional[str] = None, parent: Optional["NotionPage"] = None, load: bool = True):
+    def __init__(
+        self, token: str, page_id: Optional[str] = None, parent: Optional["NotionPage"] = None, load: bool = True, recursive: bool = False
+    ):
         self.token = token
         self.n_client = NotionClient(token)
 
@@ -389,6 +379,7 @@ class NotionPage:
         self.title = None
 
         self.blocks: List[dict] = []
+        self.children: List[Union["NotionPage", "NotionDatabase"]] = []
         self.child_pages: List["NotionPage"] = []
         self.child_databases: List["NotionDatabase"] = []
 
@@ -400,6 +391,9 @@ class NotionPage:
 
         if load:
             self.get_blocks()
+
+        if recursive:
+            self.get_children(recursive=recursive)
 
         self.local_dir = Path.cwd()
         self.file_path = None
@@ -500,6 +494,20 @@ class NotionPage:
         )
         return NotionDatabase(token=self.n_client.token, database_id=database["id"])
 
+    def get_children(self, force: bool = False, recursive: bool = False) -> List[Union["NotionPage", "NotionDatabase"]]:
+        """Get children of a page."""
+        if force or not self.children:
+            try:
+                blocks = self.get_blocks()
+                for block in blocks:
+                    if block["type"] == "child_page":
+                        self.children.append(NotionPage(token=self.n_client.token, page_id=block["id"], load=False, recursive=recursive))
+                    elif block["type"] == "child_database":
+                        self.children.append(NotionDatabase(token=self.n_client.token, database_id=block["id"]))
+            except Exception as e:
+                logger.error(f"Error: {e}")
+        return self.children
+
     def get_child_pages(self, force: bool = False) -> List["NotionPage"]:
         """Get Child Pages.
 
@@ -511,11 +519,13 @@ class NotionPage:
         """
 
         if force or not self.child_pages:
-            blocks = self.get_blocks()
-
-            for block in blocks:
-                if block["type"] == "child_page":
-                    self.child_pages.append(NotionPage(token=self.n_client.token, page_id=block["id"], load=False))
+            try:
+                blocks = self.get_blocks()
+                for block in blocks:
+                    if block["type"] == "child_page":
+                        self.child_pages.append(NotionPage(token=self.n_client.token, page_id=block["id"], load=False))
+            except Exception as e:
+                logger.error(f"Error: {e}")
         return self.child_pages
 
     def get_child_databases(self, force: bool = False) -> List["NotionDatabase"]:
@@ -739,7 +749,7 @@ class NotionDatabase:
 
         try:
             self.database_info: Dict[str, Any] = self.n_client.client.databases.retrieve(database_id=database_id)
-
+            self.title = self.database_info["title"]
             parent_type = self.database_info["parent"]["type"]
             if parent_type == "page_id":
                 self.parent = NotionPage(token=self.token, page_id=self.database_info["parent"][parent_type], load=False)
@@ -787,6 +797,9 @@ class NotionDatabase:
             self.n_client.client.databases.update(self.database_id, properties={prop_name: None})
         except Exception:
             logger.error(f"Failed to remove property '{prop_name}' from database '{self.database_id}'.")
+
+    def get_children(self, force: bool = False) -> List[NotionPage]:
+        return self.get_pages(force=force)
 
     def get_pages(self, force: bool = False) -> List[NotionPage]:
         """Get Pages."""

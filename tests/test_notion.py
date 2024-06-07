@@ -197,19 +197,21 @@ def test_notion_page():
 
     blocks = []
     blocks.append(NotionBlock.create_table_of_contents_block())
-    blocks.append(NotionBlock.create_heading_block("I'm a heading.", level=1))
+    blocks.append(NotionBlock.create_heading_block("I'm a heading Level 1", level=1))
     blocks.append(NotionBlock.create_paragraph_block("I'm a red bold italic paragraph.", color="red", bold=True, italic=True))
     blocks.append(NotionBlock.create_heading_block("I'm a blue bold italic heading.", level=2, color="blue", bold=True, italic=True))
-    # blocks.append(NotionBlock.create_list_block(["I'm a bulleted list.", "I'm a bulleted list."], numbered=False))
-    blocks.append(NotionBlock.create_heading_block("I'm a heading.", level=3))
+    blocks.append(NotionBlock.create_heading_block("I'm a heading level 3", level=3))
+    blocks.append(NotionBlock.create_heading_block("I'm a heading at default level."))
+    blocks.append(NotionBlock.create_heading_block("I'm a heading level 2", level=2))
+
     # blocks.append(NotionBlock.create_list_block(["I'm a numbered list.", "I'm a numbered list."], numbered=True))
-    blocks.append(NotionBlock.create_heading_block("I'm a heading."))
+    # blocks.append(NotionBlock.create_list_block(["I'm a bulleted list.", "I'm a bulleted list."], numbered=False))
+
+    blocks.extend(NotionBlock.create_to_do_block(["I'm a to-do list.", "Another Item"], checked=[True, False]))
+
     blocks.append(NotionBlock.create_heading_block("I'm a heading.", level=2))
-    blocks.append(NotionBlock.create_to_do_block("I'm a to-do list.", checked=True))
-    blocks.append(NotionBlock.create_heading_block("I'm a heading.", level=2))
-    blocks.append(NotionBlock.create_to_do_block("I'm a to-do list.", checked=False))
     blocks.append(NotionBlock.create_quote_block("I'm a quote."))
-    blocks.append(NotionBlock.create_heading_block("I'm a heading.", level=2))
+    blocks.append(NotionBlock.create_heading_block("I'm a heading.", level=3))
     blocks.append(NotionBlock.create_code_block("import os", language="python"))
     blocks.append(NotionBlock.create_code_block("#include <stdio.h>", language="c"))
     # create_embed_block(url: str) -> dict:
@@ -218,7 +220,6 @@ def test_notion_page():
             "https://www.notion.so/cosgroma/Planning-for-product-development-cb0163c37cca49848345104644b544d9?pvs=4"
         )
     )
-    # create_toggle_block(text: str, children: List[dict] = None) -> dict:
     blocks.append(
         NotionBlock.create_toggle_block("I'm a toggle list.", children=[NotionBlock.create_paragraph_block("I'm a child block.")])
     )

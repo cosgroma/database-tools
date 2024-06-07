@@ -120,20 +120,22 @@ def create_rich_text(
     code: bool = False,
     color: str = "default",
 ) -> Dict[str, Any]:
-    return {
-        "type": "text",
-        "text": {"content": text, "link": link},
-        "annotations": {
-            "bold": bold,
-            "italic": italic,
-            "strikethrough": strikethrough,
-            "underline": underline,
-            "code": code,
-            "color": color,
-        },
-        "plain_text": text,
-        "href": None,
-    }
+    return [
+        {
+            "type": "text",
+            "text": {"content": text, "link": link},
+            "annotations": {
+                "bold": bold,
+                "italic": italic,
+                "strikethrough": strikethrough,
+                "underline": underline,
+                "code": code,
+                "color": color,
+            },
+            "plain_text": text,
+            "href": None,
+        }
+    ]
 
 
 class RichText:
@@ -247,7 +249,7 @@ def create_paragraph_block(
     underline: bool = False,
     code: bool = False,
 ) -> Dict[str, Any]:
-    return {"paragraph": {"rich_text": [create_rich_text(text, link, bold, italic, strikethrough, underline, code, color)], "color": color}}
+    return {"paragraph": {"rich_text": create_rich_text(text, link, bold, italic, strikethrough, underline, code, color), "color": color}}
 
 
 # {
@@ -297,7 +299,7 @@ def create_heading_block(
         raise ValueError("Level must be 1, 2, or 3")
     return {
         f"heading_{level}": {
-            "rich_text": [create_rich_text(text, link, bold, italic, strikethrough, underline, code, color)],
+            "rich_text": create_rich_text(text, link, bold, italic, strikethrough, underline, code, color),
             "is_toggleable": toggleable,
             "color": color,
         }
@@ -326,8 +328,8 @@ def create_list_block(
 
 
 def create_to_do_block(
-    text: str,
-    checked: bool = False,
+    text: List[str],
+    checked: Optional[List[bool]] = None,
     link: Optional[str] = None,
     bold: bool = False,
     italic: bool = False,
@@ -336,12 +338,27 @@ def create_to_do_block(
     code: bool = False,
     color: str = "default",
 ) -> dict:
-    return {
-        "to_do": {
-            "rich_text": create_rich_text(text, link, bold, italic, strikethrough, underline, code, color),
-            "checked": checked,
+    if checked is None:
+        checked = [False] * len(text)
+    if len(text) != len(checked):
+        raise ValueError("Length of text and checked must be the same")
+    return [
+        {
+            "to_do": {
+                "rich_text": create_rich_text(item, link, bold, italic, strikethrough, underline, code, color),
+                "checked": check,
+            }
         }
-    }
+        for item, check in zip(text, checked)
+    ]
+
+
+# {
+#         "to_do": {
+#             "rich_text": create_rich_text(text, link, bold, italic, strikethrough, underline, code, color),
+#             "checked": checked,
+#         }
+#     }
 
 
 def create_quote_block(
