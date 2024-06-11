@@ -26,13 +26,22 @@ from typing import Optional
 from typing import Union
 
 from pydantic import BaseModel
+from pydantic import computed_field
 from pydantic import field_validator
 
+import json
+from pathlib import Path
+        
 
 class TextContent(BaseModel):
     content_type: str = "text"
     parts: List[str]
 
+    @computed_field(return_type=str)
+    @property
+    def text(self):
+        return " ".join(self.parts)
+    
     def __str__(self):
         return " ".join(self.parts)
 
@@ -51,6 +60,13 @@ class CodeContent(BaseModel):
 
     def __str__(self):
         return f"```{self.language}\n{self.text}\n```"
+    
+    def append_code_to_file(self, file_path: str):
+        with open(file_path, "a") as file:
+            file.write(f"{self.text}")
+            file.write("\n")
+        
+        
 
 
 # {
@@ -152,17 +168,63 @@ class Author(BaseModel):
 #     "recipient": "all"
 # },
 
+import uuid
 
+def generate_uuid():
+    return str(uuid.uuid4())
+
+class SimpleMessage(BaseModel):
+    id: str
+    role: str
+    content: str = ""
+    tags: Optional[List[str]] = None
+
+    @computed_field(return_type=str)
+    @property
+    def summary(self):
+        return self.content[:20]
+    
+    @field_validator("id", mode="before")
+    def validate_id(cls, value):
+        if value is None:
+            return generate_uuid()
+        return value
+    
+    @field_validator("tags")
+    def validate_tags(cls, value):
+        if value is None:
+            return []
+        return value
+    
+    @field_validator("role")
+    def validate_role(cls, value):
+        if value is None:
+            return "unknown"
+        return value
+    
+    def __str__(self):
+        return f"{self.role}: {self.content:20}..."
+
+    @classmethod
+    def from_message(cls, message: "Message") -> "SimpleMessage":
+        if message is None:
+            return cls(role="unknown", content="")
+        content = str(message.content) if message.content is not None else ""
+        role = message.author.role if message.author is not None else "unknown"
+        return cls(id=message.id, role=role, content=content)
+    
 class Message(BaseModel):
     id: str
     author: Author
     create_time: Optional[float]
-    update_time: Optional[float]
+    update_time: Optional[float] = None
     status: str
-    end_turn: Optional[bool]
+    end_turn: Optional[bool] = False
     recipient: str
     weight: float
     metadata: Dict[str, Any]
+    conversation_id: Optional[str] = None
+    parent_message_id: Optional[str] = None
 
     content: Union[TextContent, CodeContent, MultimodalTextContent]
 
@@ -171,24 +233,19 @@ class Message(BaseModel):
         validate_content_type(value.content_type, value.model_dump())
         return value
 
+    def to_simple_message(self) -> SimpleMessage:
+        content = str(self.content) if self.content is not None else ""
+        role = self.author.role if self.author is not None else "unknown"
+        return SimpleMessage(id=self.id, role=role, content=content)
+    
     def __str__(self):
-        return f"[{self.author.role}, {self.weight}]: {self.content:20}"
+        content = str(self.content) if self.content is not None else ""
+        
+        return f"[{self.author.role}, {self.weight}]: {content:20}..."
+    
+    def content_is_code(self):
+        return self.content.content_type == "code"
 
-
-class SimpleMessage(BaseModel):
-    role: str
-    content: str
-
-    def __str__(self):
-        return f"{self.role}: {self.content:20}..."
-
-    @classmethod
-    def from_message(cls, message: Message) -> "SimpleMessage":
-        if message is None:
-            return cls(role="unknown", content="")
-        content = str(message.content) if message.content is not None else ""
-        role = message.author.role if message.author is not None else "unknown"
-        return cls(role=role, content=content)
 
 
 # {
@@ -217,12 +274,14 @@ class SimpleMessage(BaseModel):
 # },
 class Mapping(BaseModel):
     id: str
-    parent: Optional[str]
-    children: Optional[List[str]]
+    parent: Optional[str] = ""
+    children: Optional[List[str]] = []
     message: Optional[Message]
 
     def __str__(self):
-        return f"[{self.parent:5}]{self.id:5} -> {self.message:20}..."
+        message = "" if self.message is None else self.message
+        parent = "" if self.parent is None else self.parent
+        return f"[{parent:5}]{self.id:5} -> {message:20}..."
 
 
 # {
@@ -250,19 +309,101 @@ class Conversation(BaseModel):
     create_time: float
     update_time: float
     current_node: Optional[str]
-    moderation_results: Optional[List[Any]]
+    moderation_results: Optional[List[Any]] = []
     plugin_ids: Optional[List[str]] = None
     safe_urls: Optional[List[str]] = None
     mapping: Dict[str, Mapping]
+    tags: Optional[List[str]] = None
+    
+    @computed_field(return_type=int)
+    @property
+    def num_messages(self):
+        return len(self.mapping)
 
     def __str__(self):
-        return f"[{self.default_model_slug}]: {self.title} -- {self.id:10}"
+        return f"[{self.default_model_slug}]:({self.title},{self.num_messages})"
 
     def to_records(self) -> List[SimpleMessage]:
         records = []
         for mapping in self.mapping.values():
             records.append(SimpleMessage.from_message(mapping.message))
         return records
+    
+    def get_messages(self) -> List[Message]:
+        messages = []
+        for mapping in self.mapping.values():
+            message = mapping.message
+            if message is None:
+                print(f"Message is None: {mapping}")
+                continue
+            message.conversation_id = self.id
+            mapping_parent = self.mapping[mapping.parent] if mapping.parent else None
+            if mapping_parent is None:
+                message.parent_message_id = None
+            else:
+                if mapping_parent.message is None:
+                    print(f"Parent message is None: {mapping_parent}")
+                    continue
+                message.parent_message_id = mapping_parent.message.id
+            messages.append(mapping.message)
+        return messages
+    
+    def add_mapping(self, mapping: Mapping):
+        self.mapping[mapping.id] = mapping
+    
+    def remove_mapping(self, mapping_id: str) -> Optional[Mapping]:
+        return self.mapping.pop(mapping_id, None)
+    
+    def get_mapping(self, mapping_id: str) -> Optional[Mapping]:
+        return self.mapping.get(mapping_id, None)
+    
+    def get_parent_mapping(self, mapping_id: str) -> Optional[Mapping]:
+        mapping = self.get_mapping(mapping_id)
+        if mapping is None:
+            return None
+        return self.get_mapping(mapping.parent)
+    
+        
+class Conversations(BaseModel):
+    conversations: Optional[List[Conversation]] = []
+    
+    def rm(self, conversation_id: str) -> Optional[Conversation]:
+        for i, conversation in enumerate(self.conversations):
+            if conversation.id == conversation_id:
+                return self.conversations.pop(i)
+        return None
+    
+    def add(self, conversation: Conversation):
+        self.conversations.append(conversation)
+    
+    def load(self, file_path: str) -> List[Conversation]:
+        if not Path.is_file(Path(file_path)):
+            print(f"File {file_path} does not exist")
+            return []
+        with Path.open(file_path) as file:
+            data = json.load(file)
+            for conv in data:
+                try:
+                    self.conversations.append(Conversation(**conv))
+                except Exception as e:
+                    print(f"Error loading conversation: {e}")
+            return self.conversations
+    
+    def save(self, file_path: str):
+        with Path.open(file_path, "w") as file:
+            json.dump([conv.model_dump() for conv in self.conversations], file)
+            
+    def __str__(self):
+        return f"Conversations({len(self.conversations)})"
+    
+    def get_title_list(self) -> List[str]:
+        return [conv.title for conv in self.conversations if conv.title is not None]
+    
+    def get_average_message_count(self) -> float:
+        return sum([conv.num_messages for conv in self.conversations]) / len(self.conversations)
+    
+    def longest_conversation(self) -> Conversation:
+        return max(self.conversations, key=lambda conv: conv.num_messages)
 
     # summary: Optional[str] = None
     # @field_validator('mapping')
@@ -271,3 +412,8 @@ class Conversation(BaseModel):
     #         if mapping.message:
     #             validate_content_type(mapping.message.content.content_type, mapping.message.content.model_dump())
     #     return value
+
+
+
+    
+    

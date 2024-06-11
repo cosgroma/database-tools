@@ -15,7 +15,7 @@ from .base_controller import T
 NOTION_API_KEY = os.getenv("NOTION_API_KEY")
 
 
-class NotionDatabaseController(DatabaseController):
+class NotionDatabaseController(DatabaseController[T]):
     def __init__(self, token: str, database_id: Optional[str] = None, DataClass: Optional[Type[T]] = None):
         super().__init__()
         self.token = token

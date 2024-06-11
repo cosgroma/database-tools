@@ -9,9 +9,15 @@ from .adapters.notion import NotionDatabase
 from .adapters.notion import NotionDownloader
 from .adapters.notion import NotionExporter
 from .adapters.notion import NotionPage
-from .controller.mongo_controller import DatabaseController
+from .controller.mongo_controller import MongoCollectionController
+
 
 load_dotenv()  # take environment variables
+
+
+
+# MONGO_DB = os.getenv("MONGO_DB")
+
 
 __all__ = [
     "JsonToMdConverter",
@@ -21,5 +27,5 @@ __all__ = [
     "NotionDownloader",
     "NotionExporter",
     "NotionBlock",
-    "DatabaseController",
+    "MongoCollectionController",
 ]

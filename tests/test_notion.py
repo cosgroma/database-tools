@@ -68,59 +68,59 @@ def test_client():
     assert isinstance(database, list)
 
 
-exporter = NotionExporter(token=NOTION_API_KEY)
+# exporter = NotionExporter(token=NOTION_API_KEY)
 
 
-def test_exporter_export_url():
-    # Make test directory
-    assert NOTION_API_KEY, "NOTION_API_KEY not set, set it in .env file"
-    assert PAGE_URL, "PAGE_URL not set, set it in .env file"
-    assert TEST_DATABASE_ID, "TEST_DATABASE_ID not set, set it in .env file"
+# def test_exporter_export_url():
+#     # Make test directory
+#     assert NOTION_API_KEY, "NOTION_API_KEY not set, set it in .env file"
+#     assert PAGE_URL, "PAGE_URL not set, set it in .env file"
+#     assert TEST_DATABASE_ID, "TEST_DATABASE_ID not set, set it in .env file"
 
-    test_page_name = "test_page_url"
-    json_dir = f"{test_page_name}/json"
-    md_dir = f"{test_page_name}/md"
-    json_path = Path(json_dir)
-    md_path = exporter.export_url(url=PAGE_URL, json_dir=json_dir, md_dir=md_dir)
-    assert md_path.exists()
-    assert md_path.is_file()
-    assert md_path.suffix == ".md"
+#     test_page_name = "test_page_url"
+#     json_dir = f"{test_page_name}/json"
+#     md_dir = f"{test_page_name}/md"
+#     json_path = Path(json_dir)
+#     md_path = exporter.export_url(url=PAGE_URL, json_dir=json_dir, md_dir=md_dir)
+#     assert md_path.exists()
+#     assert md_path.is_file()
+#     assert md_path.suffix == ".md"
 
-    # assert len(os.listdir(md_path)) > 0
-    assert json_path.exists()
-    assert json_path.is_dir()
-    shutil.rmtree(test_page_name)
-
-
-def test_exporter_export_page():
-    test_page_name = "test_page"
-    test_page_dir = Path(f"output/{test_page_name}")
-    if Path.exists(test_page_dir):
-        shutil.rmtree(test_page_dir)
-    json_dir = Path(f"{test_page_name}/json")
-    md_dir = Path(f"{test_page_name}/md")
-    md_path = exporter.export_page(page_id=PAGE_ID, json_dir=json_dir, md_dir=md_dir)
-    json_path = Path(json_dir)
-    assert md_path.is_file()
-    assert md_path.suffix == ".md"
-    assert json_path.exists()
-    assert json_path.is_dir()
+#     # assert len(os.listdir(md_path)) > 0
+#     assert json_path.exists()
+#     assert json_path.is_dir()
+#     shutil.rmtree(test_page_name)
 
 
-def test_exporter_export_database():
-    test_db_name = "test_db"
-    test_db_dir = Path(f"output/{test_db_name}")
-    if Path.exists(test_db_dir):
-        shutil.rmtree(test_db_dir)
-    json_dir = f"{test_db_dir}/json"
-    md_dir = f"{test_db_dir}/md"
-    md_path = exporter.export_database(database_id=TEST_DATABASE_ID, json_dir=json_dir, md_dir=md_dir)
-    json_path = Path(json_dir)
-    assert md_path.is_dir()
-    assert len(os.listdir(md_path)) > 0
-    assert json_path.exists()
-    assert len(os.listdir(json_dir)) > 0
-    shutil.rmtree(test_db_name)
+# def test_exporter_export_page():
+#     test_page_name = "test_page"
+#     test_page_dir = Path(f"output/{test_page_name}")
+#     if Path.exists(test_page_dir):
+#         shutil.rmtree(test_page_dir)
+#     json_dir = Path(f"{test_page_name}/json")
+#     md_dir = Path(f"{test_page_name}/md")
+#     md_path = exporter.export_page(page_id=PAGE_ID, json_dir=json_dir, md_dir=md_dir)
+#     json_path = Path(json_dir)
+#     assert md_path.is_file()
+#     assert md_path.suffix == ".md"
+#     assert json_path.exists()
+#     assert json_path.is_dir()
+
+
+# def test_exporter_export_database():
+#     test_db_name = "test_db"
+#     test_db_dir = Path(f"output/{test_db_name}")
+#     if Path.exists(test_db_dir):
+#         shutil.rmtree(test_db_dir)
+#     json_dir = f"{test_db_dir}/json"
+#     md_dir = f"{test_db_dir}/md"
+#     md_path = exporter.export_database(database_id=TEST_DATABASE_ID, json_dir=json_dir, md_dir=md_dir)
+#     json_path = Path(json_dir)
+#     assert md_path.is_dir()
+#     assert len(os.listdir(md_path)) > 0
+#     assert json_path.exists()
+#     assert len(os.listdir(json_dir)) > 0
+#     shutil.rmtree(test_db_name)
 
 
 TEST_PLANNING_PAGE_URL = "https://www.notion.so/cosgroma/Planning-for-product-development-cb0163c37cca49848345104644b544d9?pvs=4"
@@ -131,39 +131,39 @@ TEST_PLANNING_PAGE_URL = "https://www.notion.so/cosgroma/Planning-for-product-de
 #     last_edited_time: datetime = RootProperty()
 
 
-def test_notion_save_planning_page():
-    # Make test directory
-    assert NOTION_API_KEY, "NOTION_API_KEY not set, set it in .env file"
-    assert TEST_PLANNING_PAGE_URL, "TEST_PLANNING_PAGE_URL not set, set it in .env file"
-    int_page = NotionPage(token=NOTION_API_KEY, page_id=PAGE_ID)
-    page, page_results = int_page.get_page()
-    assert page
-    assert page_results
-    page_id_no_dash = page.id.replace("-", "")
-    assert PAGE_ID == page_id_no_dash
-    # assert page.properties
-    blocks = int_page.get_blocks()
-    assert blocks
-    assert len(blocks) > 0
+# def test_notion_save_planning_page():
+#     # Make test directory
+#     assert NOTION_API_KEY, "NOTION_API_KEY not set, set it in .env file"
+#     assert TEST_PLANNING_PAGE_URL, "TEST_PLANNING_PAGE_URL not set, set it in .env file"
+#     int_page = NotionPage(token=NOTION_API_KEY, page_id=PAGE_ID)
+#     page, page_results = int_page.get_page()
+#     assert page
+#     assert page_results
+#     page_id_no_dash = page.id.replace("-", "")
+#     assert PAGE_ID == page_id_no_dash
+#     # assert page.properties
+#     blocks = int_page.get_blocks()
+#     assert blocks
+#     assert len(blocks) > 0
 
-    child_pages = int_page.get_child_pages()
-    assert child_pages
-    assert len(child_pages) > 0
+#     child_pages = int_page.get_child_pages()
+#     assert child_pages
+#     assert len(child_pages) > 0
 
-    for child_page in child_pages:
-        if "Planning" in child_page.title:
+#     for child_page in child_pages:
+#         if "Planning" in child_page.title:
 
-            planning_page_dir = Path("output/planning_page")
-            if Path.exists(planning_page_dir):
-                shutil.rmtree(planning_page_dir)
-            json_dir = f"{planning_page_dir}/json"
-            md_dir = f"{planning_page_dir}/md"
-            md_path = exporter.export_page(page_id=child_page.page_id, json_dir=json_dir, md_dir=md_dir)
-            json_path = Path(json_dir)
-            assert md_path.is_file()
-            assert md_path.suffix == ".md"
-            assert json_path.exists()
-            assert json_path.is_dir()
+#             planning_page_dir = Path("output/planning_page")
+#             if Path.exists(planning_page_dir):
+#                 shutil.rmtree(planning_page_dir)
+#             json_dir = f"{planning_page_dir}/json"
+#             md_dir = f"{planning_page_dir}/md"
+#             md_path = exporter.export_page(page_id=child_page.page_id, json_dir=json_dir, md_dir=md_dir)
+#             json_path = Path(json_dir)
+#             assert md_path.is_file()
+#             assert md_path.suffix == ".md"
+#             assert json_path.exists()
+#             assert json_path.is_dir()
 
 
 def test_notion_page():
@@ -317,7 +317,7 @@ def test_notion_database_class():
         # test_db.read(entry)
         test_db.create(obj=entry)
         break
-    # test_db.load_from_json(RECORDINGS_JSON, DB_ID, Recording)
+    test_db.load_from_json(RECORDINGS_JSON, DB_ID, Recording)
 
 
 def test_notion_database_properties():

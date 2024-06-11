@@ -14,6 +14,7 @@ from databasetools.models.conversation_model import Message
 from databasetools.models.conversation_model import TextContent
 
 MONGO_URI = os.getenv("MONGO_URI")
+print(MONGO_URI)
 # Example usage:
 # manager = ChatManager(db_uri="mongodb://192.168.50.49:27017", db_name="chatgpt_db_test")
 # conversations = manager.load_conversations('path_to_file.json')

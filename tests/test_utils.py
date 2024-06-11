@@ -1,3 +1,11 @@
+
+from typing import Dict
+from typing import List
+from typing import Union
+from typing import Any
+
+
+from databasetools.utils import md_utils
 from databasetools.adapters.notion import utils
 
 # def flatten_dict(data: Dict):
@@ -114,3 +122,27 @@ def test_slugify():
     test_string = "Héllø Wörld"
     expected = "hell-world"
     assert utils.slugify(test_string) == expected
+    
+from pprint import pprint
+def test_markdown_utils():
+    test_string = """
+Lorem ipsum
+```python
+print('foo```bar```foo')
+print('foo```bar```foo')
+```
+Lorem ipsum
+```python
+print('foo```bar```foo')
+print('foo```bar```foo')
+```
+Lorem ipsum
+```
+print('foo```bar```foo')
+print('foo```bar```foo')
+```
+"""
+    code_blocks = md_utils.get_code_blocks(test_string)
+    # print(code_blocks)
+    for code_block in code_blocks:
+        pprint(code_block)

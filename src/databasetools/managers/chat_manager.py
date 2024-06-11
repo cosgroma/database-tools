@@ -4,10 +4,54 @@ from typing import List
 
 from pymongo import MongoClient
 
-from ..models.conversation_model import Conversation
+from ..models.conversation_model import Conversation, Message
 
+from pathlib import Path
+from typing import List, TypeVar, Generic
+import json
 
-class ChatManager:
+# T = TypeVar('T')
+# from ..controller.base_controller import DatabaseController
+
+# class ChatManager():
+#     """A class to manage chat conversations.
+
+#     Attributes:
+#         db_controller (DatabaseController): The database controller to manage database operations.
+#     """
+
+#     def __init__(self, db_controller: DatabaseController[T]):
+#         """Initialize the ChatManager with a database controller."""
+#         self.db_controller = db_controller
+
+#     def load_conversations(self, file_path: str) -> List[T]:
+#         """Load conversations from a JSON file and store them using the database controller."""
+#         with Path(file_path).open() as file:
+#             data = json.load(file)
+#             conversations = []
+#             for conv in data:
+#                 try:
+#                     conversation = self.db_controller.model(**conv)  # Assuming the model can be accessed from the controller
+#                     self.db_controller.create(conversation.dict())
+#                     conversations.append(conversation)
+#                 except Exception as e:
+#                     print(f"Error: {e} for conversation: {conv.get('title', 'Unknown')}")
+#         return conversations
+
+#     def upload_to_mongo(self, conversations: List[T], overwrite: bool = False) -> int:
+#         """Upload conversations to the database."""
+#         uploaded = 0
+#         for conversation in conversations:
+#             if self.db_controller.read({"id": conversation.id}) and not overwrite:
+#                 print(f"Conversation {conversation.id} already exists, skipping")
+#                 continue
+#             self.db_controller.update({"id": conversation.id}, conversation.dict())
+#             uploaded += 1
+#         return uploaded
+
+    # Additional methods can be added here as needed
+
+class ChatManagerv0:
     """A class to manage chat conversations and upload them to a MongoDB database.
 
     Attributes:
@@ -28,9 +72,13 @@ class ChatManager:
         self.client = MongoClient(db_uri)
         self.db = self.client[db_name]
         self.conversations_collection = self.db[conversation_collection_name]
+        self.conversation_messages = self.db["conversation_messages"]
         self.logs = self.db["chat_manager_logs"]
 
-    def load_conversations(self, file_path: str) -> List[Conversation]:
+    def load_conversations(self, file_path: str, store: bool = False, log: bool = True) -> List[Conversation]:
+        if not Path.is_file(file_path):
+            print(f"File {file_path} does not exist")
+            return []
         with Path.open(file_path) as file:
             data = json.load(file)
             conversations = []
@@ -40,8 +88,17 @@ class ChatManager:
                     conversations.append(conversation)
                 except Exception as e:
                     print(f"Error: {e} for conversation: {conv['title']}")
-        self.logs.insert_one({"action": "load_conversations", "file_path": file_path, "num_conversations": len(conversations)})
+        
+        if log:
+            self.logs.insert_one({"action": "load_conversations", "file_path": file_path, "num_conversations": len(conversations)})
         return conversations
+    
+    def extract_messages_from_conversation(self, conversation: Conversation) -> List[Message]:
+        messages = []
+        for message in conversation.messages:
+            messages.append(Message(**message, conversation_id=conversation.id))
+        return messages
+        
 
     def upload_to_mongo(self, conversations: List[Conversation], overwrite: bool = False) -> int:
         uploaded = 0
