@@ -19,6 +19,9 @@ The data model also includes the following classes:
 The data model is used to define the structure of the data that is stored and processed in the OpenAI conversation.
 """
 
+import json
+import uuid
+from pathlib import Path
 from typing import Any
 from typing import Dict
 from typing import List
@@ -29,9 +32,6 @@ from pydantic import BaseModel
 from pydantic import computed_field
 from pydantic import field_validator
 
-import json
-from pathlib import Path
-        
 
 class TextContent(BaseModel):
     content_type: str = "text"
@@ -41,17 +41,11 @@ class TextContent(BaseModel):
     @property
     def text(self):
         return " ".join(self.parts)
-    
+
     def __str__(self):
         return " ".join(self.parts)
 
 
-# {
-#     "content_type": "code",
-#     "language": "unknown",
-#     "response_format_name": null,
-#     "text": "import markdown"
-# },
 class CodeContent(BaseModel):
     content_type: str = "code"
     language: Optional[str] = "unknown"
@@ -60,13 +54,11 @@ class CodeContent(BaseModel):
 
     def __str__(self):
         return f"```{self.language}\n{self.text}\n```"
-    
+
     def append_code_to_file(self, file_path: str):
-        with open(file_path, "a") as file:
+        with Path.open(file_path, "a") as file:
             file.write(f"{self.text}")
             file.write("\n")
-        
-        
 
 
 # {
@@ -97,16 +89,9 @@ class ImageContent(BaseModel):
     metadata: Dict[str, Any]
 
 
-# {
-# "content_type": "multimodal_text",
-# "parts": []
 class MultimodalTextContent(BaseModel):
     content_type: str = "multimodal_text"
     parts: Optional[List[Dict[str, Any]]]
-
-
-# "content_type": "execution_output",
-# "text": "'/mnt/data/App_Design_Summary.md'"
 
 
 class ExecutionOutputContent(BaseModel):
@@ -136,11 +121,6 @@ def validate_content_type(content_type: str, content: Dict[str, Any]):
                 raise ValueError(f"Content type {content_type} requires attribute {attr} has {content}")
 
 
-# {
-#     "role": "user",
-#     "name": null,
-#     "metadata": {}
-# },
 class Author(BaseModel):
     role: str
     name: Optional[str] = None
@@ -168,10 +148,10 @@ class Author(BaseModel):
 #     "recipient": "all"
 # },
 
-import uuid
 
 def generate_uuid():
     return str(uuid.uuid4())
+
 
 class SimpleMessage(BaseModel):
     id: str
@@ -183,25 +163,25 @@ class SimpleMessage(BaseModel):
     @property
     def summary(self):
         return self.content[:20]
-    
+
     @field_validator("id", mode="before")
     def validate_id(cls, value):
         if value is None:
             return generate_uuid()
         return value
-    
+
     @field_validator("tags")
     def validate_tags(cls, value):
         if value is None:
             return []
         return value
-    
+
     @field_validator("role")
     def validate_role(cls, value):
         if value is None:
             return "unknown"
         return value
-    
+
     def __str__(self):
         return f"{self.role}: {self.content:20}..."
 
@@ -212,7 +192,8 @@ class SimpleMessage(BaseModel):
         content = str(message.content) if message.content is not None else ""
         role = message.author.role if message.author is not None else "unknown"
         return cls(id=message.id, role=role, content=content)
-    
+
+
 class Message(BaseModel):
     id: str
     author: Author
@@ -237,15 +218,14 @@ class Message(BaseModel):
         content = str(self.content) if self.content is not None else ""
         role = self.author.role if self.author is not None else "unknown"
         return SimpleMessage(id=self.id, role=role, content=content)
-    
+
     def __str__(self):
         content = str(self.content) if self.content is not None else ""
-        
+
         return f"[{self.author.role}, {self.weight}]: {content:20}..."
-    
+
     def content_is_code(self):
         return self.content.content_type == "code"
-
 
 
 # {
@@ -314,7 +294,7 @@ class Conversation(BaseModel):
     safe_urls: Optional[List[str]] = None
     mapping: Dict[str, Mapping]
     tags: Optional[List[str]] = None
-    
+
     @computed_field(return_type=int)
     @property
     def num_messages(self):
@@ -328,7 +308,7 @@ class Conversation(BaseModel):
         for mapping in self.mapping.values():
             records.append(SimpleMessage.from_message(mapping.message))
         return records
-    
+
     def get_messages(self) -> List[Message]:
         messages = []
         for mapping in self.mapping.values():
@@ -347,35 +327,35 @@ class Conversation(BaseModel):
                 message.parent_message_id = mapping_parent.message.id
             messages.append(mapping.message)
         return messages
-    
+
     def add_mapping(self, mapping: Mapping):
         self.mapping[mapping.id] = mapping
-    
+
     def remove_mapping(self, mapping_id: str) -> Optional[Mapping]:
         return self.mapping.pop(mapping_id, None)
-    
+
     def get_mapping(self, mapping_id: str) -> Optional[Mapping]:
         return self.mapping.get(mapping_id, None)
-    
+
     def get_parent_mapping(self, mapping_id: str) -> Optional[Mapping]:
         mapping = self.get_mapping(mapping_id)
         if mapping is None:
             return None
         return self.get_mapping(mapping.parent)
-    
-        
+
+
 class Conversations(BaseModel):
     conversations: Optional[List[Conversation]] = []
-    
+
     def rm(self, conversation_id: str) -> Optional[Conversation]:
         for i, conversation in enumerate(self.conversations):
             if conversation.id == conversation_id:
                 return self.conversations.pop(i)
         return None
-    
+
     def add(self, conversation: Conversation):
         self.conversations.append(conversation)
-    
+
     def load(self, file_path: str) -> List[Conversation]:
         if not Path.is_file(Path(file_path)):
             print(f"File {file_path} does not exist")
@@ -388,20 +368,20 @@ class Conversations(BaseModel):
                 except Exception as e:
                     print(f"Error loading conversation: {e}")
             return self.conversations
-    
+
     def save(self, file_path: str):
         with Path.open(file_path, "w") as file:
             json.dump([conv.model_dump() for conv in self.conversations], file)
-            
+
     def __str__(self):
         return f"Conversations({len(self.conversations)})"
-    
+
     def get_title_list(self) -> List[str]:
         return [conv.title for conv in self.conversations if conv.title is not None]
-    
+
     def get_average_message_count(self) -> float:
         return sum([conv.num_messages for conv in self.conversations]) / len(self.conversations)
-    
+
     def longest_conversation(self) -> Conversation:
         return max(self.conversations, key=lambda conv: conv.num_messages)
 
@@ -412,8 +392,3 @@ class Conversations(BaseModel):
     #         if mapping.message:
     #             validate_content_type(mapping.message.content.content_type, mapping.message.content.model_dump())
     #     return value
-
-
-
-    
-    
