@@ -77,3 +77,5 @@ sandbox/**
 output/**
 # src/databasetools/version.py
 **/version.py
+.venv/*
+*.diff

@@ -1,14 +1,15 @@
-pytz
-unicode
-python-dateutil==2.9.0.post0
-python-dotenv==1.0.1
 click
+docopt
 fuzzywuzzy
 levenshtein
+markdown
+mongomock @ git+https://github.com/mongomock/mongomock@develop
 notion-client>=0.8.0
 notion-database==1.2.0
 notion-objects==0.6.2
-pymongo
-mongomock @ git+https://github.com/mongomock/mongomock@develop
 pydantic
-markdown
+pymongo
+python-dateutil==2.9.0.post0
+python-dotenv==1.0.1
+pytz
+unicode
