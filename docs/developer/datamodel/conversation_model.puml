@@ -1,0 +1,46 @@
+@startuml
+class TextContent {
+    content_type: str
+    parts: List[str]
+    __str__()
+}
+class CodeContent {
+    content_type: str = "code"
+    language: Optional[str] = "unknown"
+    response_format_name: Optional[str] = None
+    text: Optional[str] = None
+    __str__()
+}
+class ImageContent {
+    content_type: str = "image"
+    url: str
+}
+
+class MultimodalTextContent {
+    content_type: str = "multimodal_text"
+    text: TextContent
+    image: ImageContent
+}
+
+class ExecutionOutputContent {
+    content_type: str = "execution_output"
+    code: CodeContent
+    output: TextContent
+}
+
+class Author {
+    id: str
+    name: str
+}
+
+class Message {
+    id: str
+}
+
+class SimpleMessage {
+    id: str
+}
+
+class Mapping {
+    id: str
+}
