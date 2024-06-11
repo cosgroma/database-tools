@@ -11,9 +11,7 @@ from .adapters.notion import NotionExporter
 from .adapters.notion import NotionPage
 from .controller.mongo_controller import MongoCollectionController
 
-
 load_dotenv()  # take environment variables
-
 
 
 # MONGO_DB = os.getenv("MONGO_DB")

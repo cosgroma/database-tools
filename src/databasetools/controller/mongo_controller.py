@@ -1,3 +1,5 @@
+import json
+from pathlib import Path
 from typing import Any
 from typing import Dict
 from typing import List
@@ -5,7 +7,6 @@ from typing import Optional
 from typing import Type
 from typing import Union
 
-import json
 from pydantic import ValidationError
 from pymongo.collection import Collection
 from pymongo.errors import PyMongoError
@@ -56,20 +57,20 @@ class MongoCollectionController(DatabaseController[T]):
             T: The created document as a Pydantic model instance.
         """
         try:
-        
+
             if isinstance(item, dict):
                 document = self.model(**item)
             elif isinstance(item, self.model):
                 document = item
             else:
                 raise ValueError(f"Item must be a dictionary or an instance of {self.model}")
-            
+
             result = self.collection.insert_one(document.model_dump(by_alias=True))
-            
+
             if not result.acknowledged:
                 raise PyMongoError("Insert operation not acknowledged by MongoDB.")
             return document
-        
+
         except ValidationError as e:
             # Handle validation errors
             print(f"Validation error: {e}")
@@ -129,7 +130,7 @@ class MongoCollectionController(DatabaseController[T]):
         """
         result = self.collection.delete_many(query)
         return result.deleted_count > 0
-    
+
     def delete_all(self):
         """
         Deletes all documents from the collection.
@@ -139,7 +140,7 @@ class MongoCollectionController(DatabaseController[T]):
         """
         result = self.collection.delete_many({})
         return result.deleted_count > 0
-    
+
     def delete_item(self, item: Union[Dict[str, Any], T]) -> bool:
         """
         Deletes a single document from the collection.
@@ -170,8 +171,8 @@ class MongoCollectionController(DatabaseController[T]):
             document = next(self._cursor)
         except StopIteration:
             # If there are no more documents, raise StopIteration to stop the iteration
-            raise StopIteration
-        
+            raise StopIteration from None
+
         # Convert the document to a Pydantic model instance
         return self.model(**document)
 
@@ -180,7 +181,7 @@ class MongoCollectionController(DatabaseController[T]):
 
     def __repr__(self):
         return f"MongoCollectionController(collection={self.collection}, model={self.model})"
-    
+
     def save_all_to_json(self, file_path: str) -> str:
         """
         Saves all documents in the collection to a JSON file.
@@ -188,8 +189,8 @@ class MongoCollectionController(DatabaseController[T]):
         Parameters:
             file_path (str): The path to save the JSON file.
         """
-        documents : List[T] = self.read({})
+        documents: List[T] = self.read({})
         json_array = [doc.model_dump() for doc in documents]
-        with open(file_path, "w") as file:
+        with Path.open(file_path, "w") as file:
             json.dump(json_array, file, indent=4)
         return file_path

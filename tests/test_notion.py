@@ -5,7 +5,6 @@
 import json
 import logging
 import os
-import shutil
 from datetime import datetime
 from pathlib import Path
 
@@ -22,7 +21,6 @@ from notion_objects import TitleText
 from databasetools import NotionBlock
 from databasetools import NotionClient
 from databasetools import NotionDatabase
-from databasetools import NotionExporter
 from databasetools import NotionPage
 from databasetools.adapters.notion import utils
 

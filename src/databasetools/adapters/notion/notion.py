@@ -63,9 +63,7 @@ from notion_objects import Page
 
 # import networkx as nx
 # import matplotlib.pyplot as plt
-
 # G = nx.DiGraph()
-
 from .json2md import JsonToMdConverter
 from .utils import find_title_prop
 from .utils import get_title_content
@@ -408,16 +406,16 @@ class NotionPage:
 
     def set_local_dir(self, local_dir: Union[str, Path]):
         """Set the local directory for saving files.
-        
+
         Args:
             local_dir (Union[str, Path]): Local Directory
-            
+
         """
         self.local_dir = Path(local_dir)
 
     def get_file_path(self) -> Path:
         """Get the file path for saving the page.
-        
+
         Returns:
             Path: File Path
         """
@@ -429,13 +427,13 @@ class NotionPage:
 
     def save(self, type: str = "json", recursive: bool = False, file_name: Optional[str] = None, parent_name: Optional[str] = None) -> Path:
         """Save the page as a file.
-        
+
         Args:
             type (str, optional): File Type. Defaults to "json".
             recursive (bool, optional): Save recursively. Defaults to False.
             file_name (Optional[str], optional): File Name. Defaults to None.
             parent_name (Optional[str], optional): Parent Name. Defaults to None.
-            
+
         Returns:
             Path: File Path
         """
@@ -491,10 +489,10 @@ class NotionPage:
 
     def get_blocks(self, force: bool = False) -> List[dict]:
         """Get all blocks in a page.
-        
+
         Args:
             force (bool, optional): Force Refresh. Defaults to False.
-            
+
         Returns:
             List[dict]: List of Blocks
         """
@@ -504,12 +502,12 @@ class NotionPage:
 
     def set_blocks(self, blocks: List[dict], clear: bool = False):
         """Set all blocks in a page.
-        
+
         Args:
             blocks (List[dict]): List of Blocks
             clear (bool, optional): Clear Existing Blocks. Defaults to False.
-            
-            
+
+
         """
         if clear:
             self.clear_blocks()
@@ -521,7 +519,7 @@ class NotionPage:
             raise ValueError("Blocks must not be empty.")
         if not isinstance(blocks[0], dict):
             raise ValueError("Blocks must be a list of dictionaries.")
-        
+
         self.n_client.client.blocks.children.append(block_id=self.page_id, children=blocks)
 
     def clear_blocks(self):
@@ -533,10 +531,10 @@ class NotionPage:
 
     def add_page(self, title: str) -> "NotionPage":
         """Add a page to the current page.
-        
+
         Args:
             title (str): Page Title
-        
+
         Returns:
             NotionPage: Notion Page
         """
@@ -615,7 +613,7 @@ class NotionPage:
 
     def __repr__(self):
         return f"NotionPage(title={self.title}, page_id={self.page_id})"
-    
+
     def info(self):
         return {
             "title": self.title,
@@ -703,10 +701,10 @@ DATABASE_PROPERTIES = {
 
 
 class NotionDatabase:
-    """ Notion Database Class 
-    
+    """Notion Database Class
+
     Attributes:
-    
+
         token (str): The authentication token for accessing the Notion API.
         database_id (str): The ID of the Notion database.
         DataClass (Optional[NotionObject]): The custom data class for database entries.
@@ -716,7 +714,7 @@ class NotionDatabase:
         pages (List[NotionPage]): The list of pages in the database.
         parent (Optional[NotionPage]): The parent page of the database.
         custom_data_class (bool): Flag to indicate if a custom data class is used.
-        
+
     Methods:
 
         set_parent(parent: NotionPage): Set the parent page of the database.
@@ -733,9 +731,9 @@ class NotionDatabase:
         get_pages(force: bool = False) -> List[NotionPage]: Get the pages in the database.
         create(properties: Optional[Dict[str, Any]] = None, obj: Optional[NotionObject] = None) -> NotionObject: Create a database entry.
         check_if_exists(title: str) -> bool: Check if a database entry exists.
-        
+
     Example Usage:
-        
+
         ```python
         database = NotionDatabase(token="your-integration-token", database_id="your-database-id")
         database.load_database(database_id="your-database-id")
@@ -748,6 +746,7 @@ class NotionDatabase:
         database.check_if_exists("John Doe")
         ```
     """
+
     def __init__(self, token: str, database_id: Optional[str] = None, DataClass: Optional[NotionObject] = None):
         self.token = token
         self.n_client = NotionClient(token=token)
@@ -862,7 +861,7 @@ class NotionDatabase:
 
     def load_database(self, database_id: str):
         """Load the database.
-        
+
         Args:
             database_id (str): Database ID
         """
@@ -889,7 +888,7 @@ class NotionDatabase:
 
     def get_properties(self) -> Dict[str, Any]:
         """Get the database properties.
-        
+
         Returns:
             Dict[str, Any]: Database Properties
         """
@@ -1007,7 +1006,6 @@ class NotionDatabase:
                 pages.append(NotionPage(token=self.token, page_id=result["id"], load=False))
             else:
                 print(f"result not dict: {type(result)}")
-
 
     def download_database(self, database_id: str, out_dir: Union[str, Path] = "./json"):
         """Download the notion database and associated pages."""

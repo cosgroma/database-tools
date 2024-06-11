@@ -11,8 +11,8 @@ from typing import Any
 from typing import Dict
 from typing import Generic
 from typing import List
-from typing import TypeVar
 from typing import Type
+from typing import TypeVar
 
 from pydantic import BaseModel
 
@@ -23,6 +23,7 @@ class DatabaseController(ABC, Generic[T]):
     """
     Abstract base class for database controllers.
     """
+
     model: Type[T]
 
     @abstractmethod

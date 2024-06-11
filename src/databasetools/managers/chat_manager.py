@@ -4,11 +4,8 @@ from typing import List
 
 from pymongo import MongoClient
 
-from ..models.conversation_model import Conversation, Message
-
-from pathlib import Path
-from typing import List, TypeVar, Generic
-import json
+from ..models.conversation_model import Conversation
+from ..models.conversation_model import Message
 
 # T = TypeVar('T')
 # from ..controller.base_controller import DatabaseController
@@ -49,7 +46,8 @@ import json
 #             uploaded += 1
 #         return uploaded
 
-    # Additional methods can be added here as needed
+# Additional methods can be added here as needed
+
 
 class ChatManagerv0:
     """A class to manage chat conversations and upload them to a MongoDB database.
@@ -88,17 +86,16 @@ class ChatManagerv0:
                     conversations.append(conversation)
                 except Exception as e:
                     print(f"Error: {e} for conversation: {conv['title']}")
-        
+
         if log:
             self.logs.insert_one({"action": "load_conversations", "file_path": file_path, "num_conversations": len(conversations)})
         return conversations
-    
+
     def extract_messages_from_conversation(self, conversation: Conversation) -> List[Message]:
         messages = []
         for message in conversation.messages:
             messages.append(Message(**message, conversation_id=conversation.id))
         return messages
-        
 
     def upload_to_mongo(self, conversations: List[Conversation], overwrite: bool = False) -> int:
         uploaded = 0

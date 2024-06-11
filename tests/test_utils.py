@@ -1,12 +1,7 @@
+from pprint import pprint
 
-from typing import Dict
-from typing import List
-from typing import Union
-from typing import Any
-
-
-from databasetools.utils import md_utils
 from databasetools.adapters.notion import utils
+from databasetools.utils.md import md_utils
 
 # def flatten_dict(data: Dict):
 # def is_time_string(s: str) -> bool:
@@ -122,8 +117,8 @@ def test_slugify():
     test_string = "Héllø Wörld"
     expected = "hell-world"
     assert utils.slugify(test_string) == expected
-    
-from pprint import pprint
+
+
 def test_markdown_utils():
     test_string = """
 Lorem ipsum

@@ -24,9 +24,14 @@ include *.yml
 include *.yaml
 include *.json
 
+include *.ps1
+recursive-include notebooks *.ipynb
+recursive-include scripts *.ps1
+recursive-include scripts *.py
+
 global-exclude *.py[cod] __pycache__/* *.so *.dylib
 global-exclude .DS_Store .DS_Store? .Trashes .Spotlight .AppleDouble .LSOverride
-global-exclude .vscode .idea .git .gitignore .gitattributes .gitmodules .gitkeep
+global-exclude .vscode .idea .git .gitignore .gitattributes .gitmodules .gitkeep *.code-workspace
 global-exclude *.bak *.swp *.tmp
 global-exclude .coverage .coverage.* .pytest_cache .mypy_cache .tox .nox
 global-exclude */venv/* */.venv/* */env/* */.env/* */dist/* */build/* */.eggs/*
