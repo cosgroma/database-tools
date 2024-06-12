@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 import mongomock
 
-from databasetools.managers.chat_manager import ChatManager
+from databasetools.managers.chat_manager import ChatManagerv0 as ChatManager
 from databasetools.models.conversation_model import Author
 from databasetools.models.conversation_model import Conversation
 from databasetools.models.conversation_model import Mapping

@@ -3,5 +3,20 @@
 		{
 			"path": "."
 		}
-	]
+	],
+	"settings": {
+		"psi-header.config": {
+			"forceToTop": true,
+			"blankLinesAfter": 1,
+			"spacesBetweenYears": false,
+			"license": "GPL-3.0",
+			"author": "Mathew Cosgrove",
+			"initials": "MAC",
+			"authorEmail": "cosgroma@gmail.com",
+			"company": "",
+			"copyrightHolder": "",
+			"creationDateZero": "now",
+			"hostname": "hawkins"
+		},
+	}
 }
