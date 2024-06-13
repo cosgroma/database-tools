@@ -6,7 +6,7 @@
 @file      md_utils.py
 @copyright (c) 2024 NORTHROP GRUMMAN CORPORATION
 -----
-Last Modified: 06/11/2024 07:30:40
+Last Modified: 06/13/2024 12:44:35
 Modified By: Mathew Cosgrove
 -----
 """
@@ -18,6 +18,7 @@ import uuid
 from collections import Counter
 from pathlib import Path
 from typing import List
+from typing import Optional
 
 import markdown
 import mistune
@@ -37,7 +38,7 @@ def get_numbered_list(lst) -> List[str]:
 # zip_code = zip(code_blocks, languages)
 
 
-def get_code_blocks(markdown_string):
+def get_code_blocks(markdown_string) -> List[str]:
     pattern = r"^```(?:\w+)?\s*\n(.*?)(?=^```)```"
     language_match = r"^```(\w+)\s*\n"
     # title_string = r"^#+\s*(.*)"
@@ -155,30 +156,49 @@ class MarkdownElementExtractor(mistune.HTMLRenderer):
         self.elements.append({"id": element_id, "type": "image", "text": text, "url": url, "alt_text": title})
         return super().image(text, url, title)
 
-    def block_code(self, code, language):
+    def block_code(self, code: str, info=None):
         element_id = str(uuid.uuid4())
-        self.elements.append({"id": element_id, "type": "code_block", "language": language, "content": code})
-        return super().block_code(code, language)
-
-
-def clean_text(text):
-    # Remove markdown formatting and non-alphabetic characters
-    text = re.sub(r"[^\w\s]", "", text)
-    return text.lower()
-
-
-def word_frequency(text):
-    words = text.split()
-    return Counter(words)
+        self.elements.append({"id": element_id, "type": "code_block", "language": info, "content": code})
+        return super().block_code(code, info)
 
 
 class MarkdownManager:
-    def __init__(self, directory_path: Path):
+    """A class for managing markdown files.
+
+    Attributes:
+        directory_path (Path): The path to the directory containing the markdown files.
+        elements (List[dict]): A list of dictionaries, where each dictionary represents an element in the markdown files.
+
+    Methods:
+        parse_markdown_file(file_path: Path) -> List[dict]: Parses a markdown file and extracts the elements.
+        parse_markdown(markdown_text: str) -> MarkdownElementExtractor: Parses a markdown string and extracts the elements.
+        extract_elements() -> List[dict]: Extracts the elements from the markdown files in the directory.
+        save_to_json(json_path: Path): Saves the elements to a JSON file.
+        read_markdown_files(directory: Path) -> str: Reads the markdown files in the directory and returns the text data.
+        clean_text(text: str) -> str: Cleans the text data.
+        word_frequency(text: str) -> Counter: Calculates the word frequency.
+    """
+
+    def __init__(self, directory_path: Optional[Path] = None):
+        """Initializes the MarkdownManager.
+
+        Args:
+            directory_path (Path): The path to the directory containing the markdown files.
+        """
+        if directory_path is None:
+            directory_path = Path.cwd()
         self.directory_path = directory_path
         self.elements = []
 
     def parse_markdown_file(self, file_path: Path) -> List[dict]:
+        """Parses a markdown file and extracts the elements.
 
+        Args:
+            file_path (Path): The path to the markdown file.
+
+        Returns:
+            List[dict]: A list of dictionaries, where each dictionary represents an element in the markdown file.
+        """
         with Path.open(file_path, "r", encoding="utf-8") as f:
             markdown_text = f.read()
 
@@ -187,8 +207,8 @@ class MarkdownManager:
         markdown(markdown_text)
 
         for element in renderer.elements:
-            element["source_file"] = Path(file_path).name
-            element["file_path"] = file_path
+            element["source_file"] = str(Path(file_path).name)
+            element["file_path"] = str(file_path)
 
         return renderer.elements
 
@@ -217,6 +237,10 @@ class MarkdownManager:
                     self.elements.extend(elements)
         return self.elements
 
+    def save_to_json(self, json_path: Path):
+        with Path.open(json_path, "w", encoding="utf-8") as f:
+            json.dump(self.elements, f, indent=4)
+
     def read_markdown_files(self, directory: Path):
         text_data = ""
         for root, _, files in os.walk(directory):
@@ -226,16 +250,30 @@ class MarkdownManager:
                         text_data += f.read() + " "
         return text_data
 
-    def save_to_json(self, json_path: Path):
-        with Path.open(json_path, "w", encoding="utf-8") as f:
-            json.dump(self.elements, f, indent=4)
+    def clean_text(self, text):
+        # Remove markdown formatting and non-alphabetic characters
+        text = re.sub(r"[^\w\s]", "", text)
+        return text.lower()
 
+    def word_frequency(self, text: str):
+        words = text.split()
+        return Counter(words)
 
-USER_HOME = Path.home()
-MD_DIR = Path.home() / ".ngira" / "notebooks" / "pgm Notebook-20240120 15-29" / "pgm Notebook" / "Trade Study" / "Brassboard"
+    def get_tables_from_text(self, markdown_text: str) -> List[str]:
+        tables = []
+        lines = markdown_text.split("\n")
+        table = []
+        in_table = False
+        for line in lines:
+            if line.startswith("|"):
+                in_table = True
+                table.append(line)
+            elif in_table:
+                tables.append("\n".join(table))
+                table = []
+                in_table = False
+        return tables
 
-# Example usage
-# main(directory_path, json_path)
 
 # raw_text = read_markdown_files(directory_path)
 # cleaned_text = clean_text(raw_text)
@@ -244,16 +282,3 @@ MD_DIR = Path.home() / ".ngira" / "notebooks" / "pgm Notebook-20240120 15-29" / 
 # # Print the word frequencies
 # for word, freq in word_freq.most_common():
 #     print(f'{word}: {freq}')
-
-
-def main():
-    mm = MarkdownManager(MD_DIR)
-    _ = mm.extract_elements()
-    mm.save_to_json(MD_DIR / "elements.json")
-    # for element in elements:
-    # print(element)
-
-
-if __name__ == "__main__":
-    # print(MD_DIR)
-    main()

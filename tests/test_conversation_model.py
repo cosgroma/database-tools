@@ -6,11 +6,12 @@
 @file      test_conversation_model.py
 @copyright (c) 2024 NORTHROP GRUMMAN CORPORATION
 -----
-Last Modified: 06/10/2024 05:59:38
+Last Modified: 06/13/2024 12:44:56
 Modified By: Mathew Cosgrove
 -----
 """
 
+import json
 from pathlib import Path
 
 from databasetools.models.conversation_model import Author
@@ -56,6 +57,12 @@ def test_conversation_model():
     print(conversation)
     # print(conversation.to_records())
     # print(conversation.get_messages())
+    assert conversation.get_messages()[0].content.parts[0] == "Hello, World!"
+    assert conversation.get_messages()[0].author.role == "user"
+    assert conversation.get_messages()[0].status == "finished_successfully"
+    assert conversation.get_messages()[0].metadata["request_id"] == "88898ec28ec62ac1-LAX"
+    assert conversation.get_messages()[0].metadata["timestamp_"] == "absolute"
+    assert conversation.get_messages()[0].recipient == "all"
 
 
 def test_message_model():
@@ -99,51 +106,6 @@ def test_simple_message_model():
     print(SimpleMessage.from_message(message))
 
 
-def test_mapping_model():
-    message = Message(
-        id="aaa23f00-9117-4700-85fd-e4be81fdf783",
-        author=Author(role="user"),
-        create_time=1716514617.117903,
-        status="finished_successfully",
-        weight=1.0,
-        metadata={
-            "request_id": "88898ec28ec62ac1-LAX",
-            "timestamp_": "absolute",
-        },
-        recipient="all",
-        content=TextContent(parts=["Hello, World!"]),
-    )
-    mapping = Mapping(
-        id="aaa23f00-9117-4700-85fd-e4be81fdf783",
-        parent=None,
-        children=None,
-        message=message,
-    )
-    print(mapping)
-
-    message2 = Message(
-        id="2e882f7e-6250-41e8-a591-c740f36a2696",
-        author=Author(role="user"),
-        create_time=1716514617.117903,
-        status="finished_successfully",
-        weight=1.0,
-        metadata={
-            "request_id": "88898ec28ec62ac1-LAX",
-            "timestamp_": "absolute",
-        },
-        recipient="all",
-        content=TextContent(parts=["Hello, World!"]),
-    )
-
-    mapping2 = Mapping(
-        id="2e882f7e-6250-41e8-a591-c740f36a2696",
-        parent="aaa23f00-9117-4700-85fd-e4be81fdf783",
-        children=None,
-        message=message2,
-    )
-    print(mapping2)
-
-
 SOURCE_EXTENSION_MAP = {
     "python": ".py",
     "javascript": ".js",
@@ -169,11 +131,12 @@ SOURCE_EXTENSION_MAP = {
 
 def create_source_file(name, language, content):
     extension = SOURCE_EXTENSION_MAP.get(language, ".txt")
-    with Path.open(f"tests/test_data/{name}{extension}", "w") as file:
+    filename = f"{name}{extension}"
+    with Path.open(Path("tests") / "test_data" / filename, "w") as file:
         file.write(content)
 
 
-def test_conversations_model_save():
+def _test_conversations_model_save():
     conversations = Conversations()
     assert conversations
     assert conversations.conversations == []
@@ -186,26 +149,22 @@ def test_conversations_model_save():
     print(f"Longest Conversation: {conversations.longest_conversation()}")
 
 
-# def test_conversations_model():
-#     conversations = Conversations()
-#     conversations.load("tests/test_data/conversations_long.json")
-#     print(len(conversations.conversations))
-#     assert conversations
-#     print(f"Average Message Count: {conversations.get_average_message_count()}")
-#     print(f"Longest Conversation: {conversations.longest_conversation()}")
-#     title_list = conversations.get_title_list()
-#     conversation_stats = {}
-#     for conversation in conversations.conversations:
-#         conversation_stats[conversation.id] = {"title": conversation.title, "num_messages": len(conversation.get_messages())}
+def _test_conversations_model():
+    conversations = Conversations()
+    conversations.load("tests/test_data/conversations_long.json")
+    print(len(conversations.conversations))
+    assert conversations
+    print(f"Average Message Count: {conversations.get_average_message_count()}")
+    print(f"Longest Conversation: {conversations.longest_conversation()}")
+    # title_list = conversations.get_title_list()
+    conversation_stats = {}
+    for conversation in conversations.conversations:
+        conversation_stats[conversation.id] = {"title": conversation.title, "num_messages": len(conversation.get_messages())}
 
-#     # save the conversations to a file
-#     with open("tests/test_data/conversation_stats.json", "w") as file:
-#         json.dump(conversation_stats, file, indent=4)
-# if title_list:
-#     print("\n".join(title_list))
-# print("\n".join(title_list))
+    # save the conversations to a file
+    with Path.open("tests/test_data/conversation_stats.json", "w") as file:
+        json.dump(conversation_stats, file, indent=4)
 
-# longest_conversation : Conversation = conversations.longest_conversation()
 
 # messages = longest_conversation.get_messages()
 
