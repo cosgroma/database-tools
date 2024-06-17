@@ -79,3 +79,4 @@ output/**
 **/version.py
 .venv/*
 *.diff
+**/.env
