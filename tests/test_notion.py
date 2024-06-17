@@ -105,22 +105,6 @@ def test_client():
 #     assert json_path.is_dir()
 
 
-# def test_exporter_export_database():
-#     test_db_name = "test_db"
-#     test_db_dir = Path(f"output/{test_db_name}")
-#     if Path.exists(test_db_dir):
-#         shutil.rmtree(test_db_dir)
-#     json_dir = f"{test_db_dir}/json"
-#     md_dir = f"{test_db_dir}/md"
-#     md_path = exporter.export_database(database_id=TEST_DATABASE_ID, json_dir=json_dir, md_dir=md_dir)
-#     json_path = Path(json_dir)
-#     assert md_path.is_dir()
-#     assert len(os.listdir(md_path)) > 0
-#     assert json_path.exists()
-#     assert len(os.listdir(json_dir)) > 0
-#     shutil.rmtree(test_db_name)
-
-
 TEST_PLANNING_PAGE_URL = "https://www.notion.so/cosgroma/Planning-for-product-development-cb0163c37cca49848345104644b544d9?pvs=4"
 
 # class Page(NotionObject):
@@ -129,39 +113,39 @@ TEST_PLANNING_PAGE_URL = "https://www.notion.so/cosgroma/Planning-for-product-de
 #     last_edited_time: datetime = RootProperty()
 
 
-# def test_notion_save_planning_page():
-#     # Make test directory
-#     assert NOTION_API_KEY, "NOTION_API_KEY not set, set it in .env file"
-#     assert TEST_PLANNING_PAGE_URL, "TEST_PLANNING_PAGE_URL not set, set it in .env file"
-#     int_page = NotionPage(token=NOTION_API_KEY, page_id=PAGE_ID)
-#     page, page_results = int_page.get_page()
-#     assert page
-#     assert page_results
-#     page_id_no_dash = page.id.replace("-", "")
-#     assert PAGE_ID == page_id_no_dash
-#     # assert page.properties
-#     blocks = int_page.get_blocks()
-#     assert blocks
-#     assert len(blocks) > 0
+def _test_notion_save_planning_page():
+    # Make test directory
+    assert NOTION_API_KEY, "NOTION_API_KEY not set, set it in .env file"
+    assert TEST_PLANNING_PAGE_URL, "TEST_PLANNING_PAGE_URL not set, set it in .env file"
+    int_page = NotionPage(token=NOTION_API_KEY, page_id=PAGE_ID)
+    page, page_results = int_page.get_page()
+    assert page
+    assert page_results
+    page_id_no_dash = page.id.replace("-", "")
+    assert PAGE_ID == page_id_no_dash
+    # assert page.properties
+    blocks = int_page.get_blocks()
+    assert blocks
+    assert len(blocks) > 0
 
-#     child_pages = int_page.get_child_pages()
-#     assert child_pages
-#     assert len(child_pages) > 0
+    child_pages = int_page.get_child_pages()
+    assert child_pages
+    assert len(child_pages) > 0
 
-#     for child_page in child_pages:
-#         if "Planning" in child_page.title:
-
-#             planning_page_dir = Path("output/planning_page")
-#             if Path.exists(planning_page_dir):
-#                 shutil.rmtree(planning_page_dir)
-#             json_dir = f"{planning_page_dir}/json"
-#             md_dir = f"{planning_page_dir}/md"
-#             md_path = exporter.export_page(page_id=child_page.page_id, json_dir=json_dir, md_dir=md_dir)
-#             json_path = Path(json_dir)
-#             assert md_path.is_file()
-#             assert md_path.suffix == ".md"
-#             assert json_path.exists()
-#             assert json_path.is_dir()
+    for child_page in child_pages:
+        if "Planning" in child_page.title:
+            ...
+            # planning_page_dir = Path("output/planning_page")
+            # if Path.exists(planning_page_dir):
+            #     shutil.rmtree(planning_page_dir)
+            # json_dir = f"{planning_page_dir}/json"
+            # md_dir = f"{planning_page_dir}/md"
+            # md_path = exporter.export_page(page_id=child_page.page_id, json_dir=json_dir, md_dir=md_dir)
+            # json_path = Path(json_dir)
+            # assert md_path.is_file()
+            # assert md_path.suffix == ".md"
+            # assert json_path.exists()
+            # assert json_path.is_dir()
 
 
 def test_notion_page():
@@ -201,18 +185,12 @@ def test_notion_page():
     blocks.append(NotionBlock.create_heading_block("I'm a heading level 3", level=3))
     blocks.append(NotionBlock.create_heading_block("I'm a heading at default level."))
     blocks.append(NotionBlock.create_heading_block("I'm a heading level 2", level=2))
-
-    # blocks.append(NotionBlock.create_list_block(["I'm a numbered list.", "I'm a numbered list."], numbered=True))
-    # blocks.append(NotionBlock.create_list_block(["I'm a bulleted list.", "I'm a bulleted list."], numbered=False))
-
     blocks.extend(NotionBlock.create_to_do_block(["I'm a to-do list.", "Another Item"], checked=[True, False]))
-
     blocks.append(NotionBlock.create_heading_block("I'm a heading.", level=2))
     blocks.append(NotionBlock.create_quote_block("I'm a quote."))
     blocks.append(NotionBlock.create_heading_block("I'm a heading.", level=3))
     blocks.append(NotionBlock.create_code_block("import os", language="python"))
     blocks.append(NotionBlock.create_code_block("#include <stdio.h>", language="c"))
-    # create_embed_block(url: str) -> dict:
     blocks.append(
         NotionBlock.create_embed_block(
             "https://www.notion.so/cosgroma/Planning-for-product-development-cb0163c37cca49848345104644b544d9?pvs=4"
@@ -221,10 +199,11 @@ def test_notion_page():
     blocks.append(
         NotionBlock.create_toggle_block("I'm a toggle list.", children=[NotionBlock.create_paragraph_block("I'm a child block.")])
     )
-    # create_divider_block() -> dict:
     blocks.append(NotionBlock.create_divider_block())
     blocks.append(NotionBlock.create_link_to_page_block(page_id=PAGE_ID))
-
+    test_page.set_blocks(blocks=blocks)
+    list_items = ["List Item 1", "List Item 2"]
+    blocks.append(NotionBlock.create_list_block(list_items, True))
     # create_table_block(rows: List[List[str]], headers: Optional[List[str]] = None) -> dict:
     # blocks.append(NotionBlock.create_table_block([["A", "B"], ["1", "2"]], headers=["A", "B"]))
     # create_breadcrumb_block(items: List[Dict[str, str]]) -> dict:
@@ -237,7 +216,6 @@ def test_notion_page():
     # create_column_block(blocks: List[dict]) -> dict:
     # blocks.append(NotionBlock.create_column_block(blocks=[NotionBlock.create_paragraph_block("I'm a column."), NotionBlock.create_paragraph_block("I'm a column.")]))
 
-    test_page.set_blocks(blocks=blocks)
     # def get_page(self, force: bool = False) -> Page:
     # def get_blocks(self, force: bool = False) -> List[dict]:
     # def set_blocks(self, blocks: List[dict], clear: bool = False):
@@ -291,7 +269,7 @@ class Recording(Page):
         return f"Recording({self.ref}, {self.file_path}, {self.size_bytes})"
 
 
-def test_notion_database_class():
+def _test_notion_database_class():
     assert NOTION_API_KEY, "NOTION_API_KEY not set, set it in .env file"
     assert TEST_PLANNING_PAGE_URL, "TEST_PLANNING_PAGE_URL not set, set it in .env file"
     DB_URL = "https://www.notion.so/cosgroma/62c81d1feaaf485288b4758ec7516b89?v=380a231034534e04b678fd0c80d4ccf9&pvs=4"

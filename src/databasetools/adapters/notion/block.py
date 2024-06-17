@@ -324,9 +324,6 @@ def create_list_block(
     return [{type: {"rich_text": create_rich_text(text, link, bold, italic, strikethrough, underline, code, color)}} for text in items]
 
 
-# def create_block(type: str, content: Union[str, List[str]], color: str = "default") -> Dict[str, Any]:
-
-
 def create_to_do_block(
     text: List[str],
     checked: Optional[List[bool]] = None,

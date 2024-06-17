@@ -43,6 +43,7 @@ This module provides tools to interact with the Notion API, enabling data manage
 """
 
 import json
+import os
 from abc import ABC
 from abc import abstractmethod
 from datetime import datetime
@@ -70,6 +71,8 @@ from .utils import get_title_content
 from .utils import logger
 from .utils import normalize_id
 from .utils import slugify
+
+NOTION_API_KEY = os.getenv("NOTION_API_KEY", None)
 
 
 class BaseTransformer(ABC):
@@ -372,8 +375,18 @@ class NotionExporter:
 
 class NotionPage:
     def __init__(
-        self, token: str, page_id: Optional[str] = None, parent: Optional["NotionPage"] = None, load: bool = True, recursive: bool = False
+        self,
+        token: Optional[str] = None,
+        page_id: Optional[str] = None,
+        parent: Optional["NotionPage"] = None,
+        load: bool = False,
+        recursive: bool = False,
     ):
+        if NOTION_API_KEY:
+            token = NOTION_API_KEY
+        if token is None:
+            raise ValueError("No token provided.")
+
         self.token = token
         self.n_client = NotionClient(token)
 
@@ -747,7 +760,11 @@ class NotionDatabase:
         ```
     """
 
-    def __init__(self, token: str, database_id: Optional[str] = None, DataClass: Optional[NotionObject] = None):
+    def __init__(self, token: Optional[str] = None, database_id: Optional[str] = None, DataClass: Optional[NotionObject] = None):
+        if NOTION_API_KEY:
+            token = NOTION_API_KEY
+        if token is None:
+            raise ValueError("No token provided.")
         self.token = token
         self.n_client = NotionClient(token=token)
         self.database_id = database_id
