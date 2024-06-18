@@ -10,6 +10,7 @@ Classes:
 """
 
 from datetime import datetime
+from enum import Enum
 from typing import List
 from typing import Optional
 
@@ -53,7 +54,7 @@ class Relationship(Element):
     relationship_type: Optional[str] = Field(None, description="The type of relationship between the source and target elements.")
 
 
-class RelationshipType:
+class RelationshipType(Enum):
     ASSOCIATION = "Association"
     DEPENDENCY = "Dependency"
     AGGREGATION = "Aggregation"
