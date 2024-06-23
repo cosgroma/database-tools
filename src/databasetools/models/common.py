@@ -42,6 +42,15 @@ class Element(BaseModel):
     documentation: Optional[str] = Field(None, description="The documentation associated with the element.")
 
 
+class RelationshipType(Enum):
+    ASSOCIATION = "Association"
+    DEPENDENCY = "Dependency"
+    AGGREGATION = "Aggregation"
+    COMPOSITION = "Composition"
+    INHERITANCE = "Inheritance"
+    REALIZATION = "Realization"
+
+
 class Relationship(Element):
     """A relationship between two elements.
 
@@ -51,13 +60,6 @@ class Relationship(Element):
     model_config = ConfigDict(arbitrary_types_allowed=True)
     source_element_id: ObjectId = Field(..., description="The ObjectId reference to the source element.")
     target_element_id: ObjectId = Field(..., description="The ObjectId reference to the target element.")
-    relationship_type: Optional[str] = Field(None, description="The type of relationship between the source and target elements.")
-
-
-class RelationshipType(Enum):
-    ASSOCIATION = "Association"
-    DEPENDENCY = "Dependency"
-    AGGREGATION = "Aggregation"
-    COMPOSITION = "Composition"
-    INHERITANCE = "Inheritance"
-    REALIZATION = "Realization"
+    relationship_type: Optional[RelationshipType] = Field(
+        None, description="The type of relationship between the source and target elements."
+    )
