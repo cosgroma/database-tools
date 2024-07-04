@@ -22,7 +22,7 @@ class Element(BaseModel):
     updated_at: datetime = Field(default_factory=datetime.now, description="Last update timestamp of the element")
     labels: List[str] = Field(default_factory=list, description="Labels associated with the element")
 
-    class Config:
+    class ConfigDict:
         use_enum_values = True
 
 
@@ -43,7 +43,7 @@ class Relationship(BaseModel):
 class Relation(BaseModel):
     source_id: str = Field(..., description="The ID of the source element")
     destination_id: str = Field(..., description="The ID of the destination element")
-    created_at: datetime = Field(default_factory=datetime.utcnow, description="Creation timestamp of the relation")
+    created_at: datetime = Field(default_factory=datetime.now, description="Creation timestamp of the relation")
     relation_type: str = Field(..., description="Type of the relationship")
 
     @field_validator("relation_type")
