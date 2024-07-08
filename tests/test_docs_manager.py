@@ -6,7 +6,6 @@ from unittest.mock import patch
 from pathlib import Path
 from databasetools.managers.docs_manager import DocManager
 from databasetools.models.mof_model import Relation, Element, ElementType
-from databasetools.adapters.oneNote.oneNote import OneNoteMd2Json 
 
 MONGO_URI = os.getenv("MONGO_URI")
 TEST_DIR = os.getenv("TEST_DIR")
@@ -23,7 +22,6 @@ class TestDocManager(unittest.TestCase):
             db_uri=MONGO_URI,
             db_name="docs_test_db"
         )
-        self.oneNote = OneNoteMd2Json()
         self.test_relation = Relation(
             source_id="1111",
             destination_id="2222",
@@ -44,13 +42,6 @@ class TestDocManager(unittest.TestCase):
     
     def test_init(self):
         self.assertIsNotNone(self.manager)
-
-    def test_parse_oneNote_export(self):
-        content = self.oneNote.parse_oneNote_export2(TEST_DIR / "source" / "Platform Library.md")
-        jstring = json.dumps(content, default=str)
-        di = json.dumps(content["content"], default=str)
-        with open(Path(TEST_DIR / "dump" / "dump.json"), "w") as f:
-            f.write(jstring)
 
     def test_upload_relation(self):
         self.assertTrue(self.manager.upload_relation(self.test_relation))

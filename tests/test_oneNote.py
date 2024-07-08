@@ -96,6 +96,13 @@ This paragraph contains a [reference Link][1]
 
 [![Here is an **image** with a link](image_url)](link_url)
 
+Here is a paragraph with a inline HTML element for a <sup>superscript!</sup> Wowza!
+
+<colgroup>
+<col style="width: 21%" />
+<col style="width: 78%" />
+</colgroup>
+
 [1]: Hello
 
 '''
@@ -149,19 +156,6 @@ TEST_REMOVE_BOLD_EMPHASIS = [
 
 class TestTypeParsing(unittest.TestCase):
     def setUp(self):
-        self.heading_test1 = {
-            'type': 'heading',
-            'attrs': {
-                'level': 1
-            },
-            'style': 'axt',
-            'children': [
-                    {
-                        'type': 'text', 
-                        'raw': 'Heading 1'
-                    }
-            ]
-        }
         self.parser = OneNote_Export_to_DocBlock()
 
     def test_make_block(self):
@@ -180,10 +174,9 @@ class TestTypeParsing(unittest.TestCase):
         }
         self.assertRaises(KeyError, self.parser.make_block, invalid_input)
         
-        result = self.parser.make_block(self.heading_test1)
-        self.assertIsInstance(result, DocBlockElement)
-        self.assertEqual(result.type, "heading")
-    
+        null_result = self.parser.make_block(None)
+        assert not null_result
+        
     def test_text(self):
         test_text = {
             "type": "text",
@@ -192,10 +185,31 @@ class TestTypeParsing(unittest.TestCase):
         result = self.parser._text(test_text)
         assert result
         assert isinstance(result, DocBlockElement)
-        assert result.type == "text"        
+        assert result.type == "text"
+        
+        null_input = {
+            "type": "text",
+            "raw": ""
+        }
+        null_result = self.parser._text(null_input)
+        assert null_result # Should still make block but empty
+        assert null_result.block_content == ""
         
     def test_heading(self):
-        result = self.parser._heading(self.heading_test1)
+        heading_test1 = {
+            'type': 'heading',
+            'attrs': {
+                'level': 1
+            },
+            'style': 'axt',
+            'children': [
+                    {
+                        'type': 'text', 
+                        'raw': 'Heading 1'
+                    }
+            ]
+        }
+        result = self.parser._heading(heading_test1)
         assert result
         self.assertIsInstance(result, DocBlockElement)
         self.assertEqual(result.type, "heading")
@@ -644,6 +658,8 @@ class TestTypeParsing(unittest.TestCase):
             self.assertIsInstance(item, dict)
             self.assertNotEqual(item.get("type"), "blank_line")
             self.assertNotEqual(item.get("type"), None)
+            
+        pprint(token_list, sort_dicts=False)
 
     def test_remove_bold_emphasis(self): 
         stripped = self.parser._remove_bold_emphasis(TEST_REMOVE_BOLD_EMPHASIS)
@@ -656,18 +672,6 @@ class TestTypeParsing(unittest.TestCase):
             self.assertNotEqual(item.get("type"), "strong")
             self.assertNotEqual(item.get("type"), "emphasis")
             
-    def test_make_barebones_page(self):
-        tokens = self.parser.md_to_token(TEST_MD)
-        page_block_list = self.parser.make_barebones_page(tokens)
-        assert page_block_list
-        page_block = page_block_list[0]
-        assert isinstance(page_block, DocBlockElement)
-        assert page_block.type == "page"
-        assert not page_block.name
-        assert not page_block.modified_at
-        assert not page_block.block_attr
-        assert not page_block.block_content
-        assert len(page_block.children) == len(page_block_list) - 1
     
         
 

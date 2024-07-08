@@ -39,6 +39,8 @@ class OneNoteTools:
                 self.upload_page(item_path)
             except TypeError:
                 missed_files.append(item_path)
+            except Exception as e:
+                raise Exception(f"From file {item_path}") from e
                 
         return missed_files
                 
@@ -47,8 +49,7 @@ class OneNoteTools:
         try:
             block_elements = self.parser.process_oneNote_page(file_path)
         except KeyError as e:
-            print(f"Key Error at file: {file_path}.")
-            raise e
+            raise Exception(f"Key Error at file: {file_path}") from e
         for block in block_elements:
             self.manager.upload_block(block)
         

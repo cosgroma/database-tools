@@ -22,7 +22,7 @@ class DocManager:
         self.blocks_controller = MongoCollectionController(self.blocks_collection, DocBlockElement)
         self.relation_controller = MongoCollectionController(self.relations_collection, BlockRelationship)
         
-    def reset_collection(self):
+    def reset_collection(self): # Danger zone! For testing only!
         self.blocks_controller.delete_all()
     
     def upload_relation(self, relation: BlockRelationship):
@@ -45,7 +45,10 @@ class DocManager:
 
 
     def upload_block(self, block: DocBlockElement):
-        return self.blocks_controller.create(block)
+        try:
+            return self.blocks_controller.create(block)
+        except Exception as e:
+            raise Exception(f"Trying to add block: {block}") from e
     
     def update_block(self, block: DocBlockElement):
         return self.blocks_controller.update({"element_id": block.id}, block)

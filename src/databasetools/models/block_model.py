@@ -31,6 +31,8 @@ class DocBlockElementType(str, Enum):
     TABLE_CELL = "table_cell"
     
     THEMATIC_BREAK = "thematic_break"
+    
+    BLOCK_HTML = "block_html"
 
 class DocBlockElement(Element):
     '''
