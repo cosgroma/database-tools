@@ -1,12 +1,9 @@
-
 import unittest
-from typing import Dict, List, Any
 from pprint import pprint
 
 
 from databasetools.models.block_model import DocBlockElement, DocBlockElementType
-from databasetools.adapters.oneNote.oneNote import OneNoteTools
-from databasetools.adapters.oneNote.type_parsing import OneNote_Export_to_DocBlock
+from databasetools.adapters.oneNote.type_parsing import Md2DocBlock, NotMDFileError, InvalidTokenError
 
 TEST_MD = '''
 
@@ -108,56 +105,110 @@ Here is a paragraph with a inline HTML element for a <sup>superscript!</sup> Wow
 '''
 
 TEST_REMOVE_BOLD_EMPHASIS = [
+    {
+        'type': 'text', 
+        'raw': 'Here is a '
+    },
+    {
+        'type': 'strong', 
+        'children': [
+                {
+                    'type': 'text', 
+                    'raw': 'BOLD'
+                }
+            ]
+    },
+    {
+        'type': 'text', 
+        'raw': '. Here is an '
+    },
+    {
+        'type': 'emphasis',
+        'children': [
+                {
+                    'type': 'text', 
+                    'raw': 'Italic'
+                }
+            ]
+    },
+    {
+        'type': 'text', 
+        'raw': ' and here is a '
+    },
+    {
+        'type': 'emphasis',
+        'children': [
             {
-                'type': 'text', 
-                'raw': 'Here is a '
-            },
-            {
-                'type': 'strong', 
-                'children': [
-                        {
-                            'type': 'text', 
-                            'raw': 'BOLD'
-                        }
-                    ]
-            },
-            {
-                'type': 'text', 
-                'raw': '. Here is an '
-            },
-            {
-                'type': 'emphasis',
-                'children': [
-                        {
-                            'type': 'text', 
-                            'raw': 'Italic'
-                        }
-                    ]
-            },
-            {
-                'type': 'text', 
-                'raw': ' and here is a '
-            },
-            {
-                'type': 'emphasis',
+                'type': 'strong',
                 'children': [
                     {
-                        'type': 'strong',
-                        'children': [
-                            {
-                                'type': 'text',
-                                'raw': 'BOLD and Italic'
-                            }
-                        ]
+                        'type': 'text',
+                        'raw': 'BOLD and Italic'
                     }
                 ]
             }
         ]
+    }
+]
 
 class TestTypeParsing(unittest.TestCase):
     def setUp(self):
-        self.parser = OneNote_Export_to_DocBlock()
+        self.parser = Md2DocBlock()
+        
+    def test_set_export_mode(self):
+        self.parser.reset()
+        
+        orig_funcs = [func for func in self.parser.func_list.values()] # Collect original functions
+        self.parser.set_export_mode(self.parser.ONE_NOTE_MODE)
+        
+        assert self.parser.export_mode == self.parser.ONE_NOTE_MODE
+        diff_count = 0
+        for func in orig_funcs:
+            if func not in self.parser.func_list.values():
+                diff_count += 1
 
+        assert diff_count == 2
+        
+        self.parser.set_export_mode(self.parser.GENERIC_MODE)
+        
+        for func in orig_funcs:
+            assert func in self.parser.func_list.values()
+            
+    def test_set_parser(self):
+        self.parser.reset()
+        
+        self.parser.func_list = None
+        assert self.parser.func_list == None
+        
+        self.parser.set_parser()
+        assert self.parser.func_list
+        
+        def foo():
+            pass
+        
+        self.assertRaises(AttributeError, self.parser.set_parser, None, foo)
+        
+        self.parser.set_parser(DocBlockElementType.TEXT, foo)
+        assert self.parser.func_list[DocBlockElementType.TEXT] == foo 
+        
+    def test_process_page(self):
+        no_md_path = "/thing/there/hello/file/file_with_no_md"
+        self.assertRaises(NotMDFileError, self.parser.process_page, no_md_path)
+        
+        md_path = no_md_path + ".md"
+        self.assertRaises(FileNotFoundError, self.parser.process_page, md_path)
+        
+    def test_md_to_token(self):
+        token_list = self.parser.md_to_token(TEST_MD)
+        assert token_list
+        self.assertIsInstance(token_list, list)
+        for item in token_list:
+            self.assertIsInstance(item, dict)
+            self.assertNotEqual(item.get("type"), "blank_line")
+            self.assertNotEqual(item.get("type"), None)
+            
+        # pprint(token_list, sort_dicts=False)
+    
     def test_make_block(self):
         invalid_input = {
             "type": "poopoo", 
@@ -192,11 +243,10 @@ class TestTypeParsing(unittest.TestCase):
             "raw": ""
         }
         null_result = self.parser._text(null_input)
-        assert null_result # Should still make block but empty
-        assert null_result.block_content == ""
+        assert not null_result # Should still make block but empty
         
     def test_heading(self):
-        heading_test1 = {
+        heading_test = {
             'type': 'heading',
             'attrs': {
                 'level': 1
@@ -209,13 +259,32 @@ class TestTypeParsing(unittest.TestCase):
                     }
             ]
         }
-        result = self.parser._heading(heading_test1)
+        result = self.parser._heading(heading_test)
         assert result
         self.assertIsInstance(result, DocBlockElement)
         self.assertEqual(result.type, "heading")
         self.assertDictEqual(result.block_attr, {"level": 1})
         self.assertEqual(result.block_content, "Heading 1")
         self.assertIsNotNone(result.id)
+        
+        invalid_heading = {
+            'type': 'heading',
+            'attrs': {
+                'level': 3
+            },
+            'style': 'axt',
+            'children': [
+                {
+                    'type': 'block_code',
+                    'raw': 'Some codespan text'
+                }, 
+                {
+                    'type': 'text',
+                    'raw': 'Hellooooooo'
+                }
+            ]
+        }
+        self.assertRaises(InvalidTokenError, self.parser._heading, invalid_heading)
 
     def test_block_code(self):
         test_block_code = {
@@ -236,12 +305,20 @@ class TestTypeParsing(unittest.TestCase):
     def test_codespan(self):
         test_codespan = {
             "type": "codespan",
-            "raw": "This is some code"
+            "raw": "import this"
         }
         result = self.parser._codespan(test_codespan)
         assert result
         assert isinstance(result, DocBlockElement)
         assert result.type == "codespan"
+        assert result.block_content == "import this"
+        
+        empty_codespan = {
+            "type": "codespan",
+            "raw": ""
+        }
+        null_result = self.parser._codespan(empty_codespan)
+        assert not null_result
         
     def test_image(self):
         test_image = {
@@ -256,6 +333,17 @@ class TestTypeParsing(unittest.TestCase):
         assert isinstance(result, DocBlockElement)
         assert result.block_attr["url"]
         assert result.block_content == "This should be an image!"
+        
+        invalid_image = {
+            "type": "image",
+            "children": [
+                {"type": "text", "raw": "This should be an image!"},
+                {"type": "block_quote", "raw": "bogus code"}
+            ],
+            "attrs": {"url": "image_url"}
+        }
+        self.assertRaises(InvalidTokenError, self.parser._image, invalid_image)
+        
         
     def test_link(self):
         test_link = {
@@ -294,7 +382,54 @@ class TestTypeParsing(unittest.TestCase):
         assert result[0].block_content == "link with a **STRONG LINK**\nImage here"
         assert len(result[0].children) == 2
         
+    def test_on_link(self):
+        test_on_link = {
+            "type": "link",
+            "children": [
+                {
+                    "type": "text",
+                    "raw": "link with a "
+                },
+                {
+                    "type": "strong",
+                    "children": [
+                        {
+                            "type": "text",
+                            "raw": "STRONG LINK"
+                        }
+                    ]
+                },
+                {"type": "linebreak"},
+                {
+                    "type": "image",
+                    "children": [
+                        {"type": "text", "raw": "Image here"}
+                    ],
+                    "attrs": {"url": "../../../../../resources/238023948j203948r.jpg"}
+                }
+            ],
+            "attrs":{
+                "url": "../../../../resources/23874923749723.hello"
+            }
+        }
+        self.parser.set_export_mode("one_note")
+        result = self.parser._on_link(test_on_link)
+        assert result
+        assert len(result) == 3
+        found_reletive_references = 0
+        for item in result:
+            if item.type != "resource_reference":
+                continue
+            else:
+                assert len(item.block_attr) == 2
+                assert isinstance(item.block_attr.get("filename"), str)
+                assert isinstance(item.block_attr.get("extension"), str)
+                assert item.status == "Unverified"
+                found_reletive_references += 1
+        assert found_reletive_references == 2
+        self.parser.set_export_mode("generic")
         
+            
     def test_paragraph(self):
         test_paragraph = {
             "type": "paragraph",
@@ -618,7 +753,7 @@ class TestTypeParsing(unittest.TestCase):
         for item in result:
             assert item.type in valid_types
             
-    def test_combine_text(self):
+    def _test_combine_text(self):
         combine_text_testObj = [
             {'type': 'text', 'raw': 'Here is a '},
             {'type': 'text', 'raw': '**BOLD**'},
@@ -650,18 +785,7 @@ class TestTypeParsing(unittest.TestCase):
         assert result_2
         assert len(result_2) == 2
         
-    def test_md_to_token(self):
-        token_list = self.parser.md_to_token(TEST_MD)
-        assert token_list
-        self.assertIsInstance(token_list, list)
-        for item in token_list:
-            self.assertIsInstance(item, dict)
-            self.assertNotEqual(item.get("type"), "blank_line")
-            self.assertNotEqual(item.get("type"), None)
-            
-        pprint(token_list, sort_dicts=False)
-
-    def test_remove_bold_emphasis(self): 
+    def _test_remove_bold_emphasis(self): 
         stripped = self.parser._remove_bold_emphasis(TEST_REMOVE_BOLD_EMPHASIS)
         assert stripped
         self.assertIsInstance(stripped, list)

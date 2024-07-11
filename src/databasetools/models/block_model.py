@@ -33,6 +33,8 @@ class DocBlockElementType(str, Enum):
     THEMATIC_BREAK = "thematic_break"
     
     BLOCK_HTML = "block_html"
+    
+    RESOURCE_REFERENCE = "resource_reference"
 
 class DocBlockElement(Element):
     '''
@@ -42,13 +44,6 @@ class DocBlockElement(Element):
     block_content: Optional[str] = Field(None, description="The content stored in this block")
     block_attr: Optional[Dict[str, Any]] = Field(None, description="Document block specific attributes")
     children: Optional[List[ObjectId]] = Field([], description="Ordered list of children blocks")
-
-    
-class PageElement(Element):
-    '''
-        Stores page metadata and is used to connect blocks to a page with PageRelationship
-    '''
-    pass
 
 class BlockRelationship(Relationship):
     '''

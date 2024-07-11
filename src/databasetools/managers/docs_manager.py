@@ -1,7 +1,8 @@
 
 from pymongo import MongoClient
-from typing import Dict, Any
+from typing import Dict, Any, List
 from pathlib import Path
+import gridfs
 
 from ..controller.mongo_controller import MongoCollectionController
 from ..models.block_model import DocBlockElement, BlockRelationship
@@ -13,36 +14,39 @@ class DocManager:
             db_uri: str,
             db_name: str,
             blocks_collection_name: str = "blocks",
-            relations_collection_name: str = "relations"
+            relations_collection_name: str = "relations",
+            gridfs_name: str = "resources"
     ):
+        self.db_uri = db_uri
+        self.db_name = db_name
+        self.blocks_collection_name = blocks_collection_name
+        self.relations_collection_name = relations_collection_name
+        self.gridfs_name = gridfs_name
         self.client = MongoClient(db_uri)
         self.db = self.client[db_name]
         self.blocks_collection = self.db[blocks_collection_name]
         self.relations_collection = self.db[relations_collection_name]
         self.blocks_controller = MongoCollectionController(self.blocks_collection, DocBlockElement)
         self.relation_controller = MongoCollectionController(self.relations_collection, BlockRelationship)
+        self.resources_db = self.client[gridfs_name]
+        self.fs = gridfs.GridFS(self.resources_db)
+        
+    def fs_store_file(self, data: bytes, **kwargs):
+        return self.fs.put(data, **kwargs)
+    
+    def fs_find_file(self, **kwargs):
+        return self.fs.find_one(dict(kwargs))
+    
+    def reset_resources(self):
+        self.client.drop_database(self.gridfs_name)
+        self.resources_db = self.client[self.gridfs_name]
+        self.fs = gridfs.GridFS(self.resources_db)
         
     def reset_collection(self): # Danger zone! For testing only!
         self.blocks_controller.delete_all()
     
     def upload_relation(self, relation: BlockRelationship):
         return self.relation_controller.create(relation)
-
-    
-    # def update_relation(self, relation: Relation): 
-    #     return self.relation_controller.update(
-    #         {
-    #             "source_id": relation.source_id, 
-    #             "destination_id": relation.destination_id,
-    #             "relation_type": relation.relation_type
-    #          }, relation) # Would this identifiation work?
-    
-    # def sync_relation(self, relation: Relation):
-    #     update_result = self.update_relation(relation)
-    #     if update_result:
-    #         return update_result
-    #     return self.upload_relation(relation)
-
 
     def upload_block(self, block: DocBlockElement):
         try:
@@ -72,6 +76,9 @@ class DocManager:
         1. Determine a query method for matching files to documents in mongo
         '''
         pass
+    
+    def find_blocks(self, **kwargs):
+        return self.blocks_controller.read(dict(kwargs))
 
 
 

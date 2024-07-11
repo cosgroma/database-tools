@@ -3,7 +3,7 @@ docopt
 fuzzywuzzy
 levenshtein
 markdown
-mongomock @ git+https://github.com/mongomock/mongomock@develop
+mongomock @ git+https://github.com/mongomock/mongomock
 notion-client>=0.8.0
 notion-database==1.2.0
 notion-objects==0.6.2
