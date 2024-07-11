@@ -39,7 +39,7 @@ peanuts.make_peanutbutter()
 This is finally a normal paragraph.
 This should be part of the same paragraph.
 
-I should be a seperate paragraph.  
+I should be a separate paragraph.  
 I should be in the same paragraph on a different line.
 
 | Here | Is | A | Table |
@@ -87,7 +87,7 @@ This should be part of the quote.
 ></html>
 >```
 
-Here is a paragraph but I will be embeding a `code block` in it.
+Here is a paragraph but I will be embedding a `code block` in it.
 
 This paragraph contains a [reference Link][1]
 
@@ -344,6 +344,32 @@ class TestTypeParsing(unittest.TestCase):
         }
         self.assertRaises(InvalidTokenError, self.parser._image, invalid_image)
         
+    def test_on_image(self):
+        on_image_token = {
+            "type": "image",
+            "children": [
+                {"type": "text", "raw": "An image to a relatively referenced image."}
+            ],
+            "attrs": {"url": "../../../resources/gecko.jpg"}
+        }
+        result = self.parser._on_image(on_image_token)
+        assert result
+        assert result.type == DocBlockElementType.RESOURCE_REFERENCE
+        assert result.status == "Unverified"
+        assert len(result.block_attr) == 2
+        assert result.block_attr.get("filename")
+        assert result.block_attr.get("extension")
+        
+        regular_image_token = {
+            "type": "image",
+            "children": [
+                {"type": "text", "raw": "This should be an image!"}
+            ],
+            "attrs": {"url": "image_url"}
+        }
+        reg_result = self.parser._on_image(regular_image_token)
+        assert reg_result
+        assert reg_result.type == DocBlockElementType.IMAGE
         
     def test_link(self):
         test_link = {
@@ -416,7 +442,7 @@ class TestTypeParsing(unittest.TestCase):
         result = self.parser._on_link(test_on_link)
         assert result
         assert len(result) == 3
-        found_reletive_references = 0
+        found_relative_references = 0
         for item in result:
             if item.type != "resource_reference":
                 continue
@@ -425,8 +451,8 @@ class TestTypeParsing(unittest.TestCase):
                 assert isinstance(item.block_attr.get("filename"), str)
                 assert isinstance(item.block_attr.get("extension"), str)
                 assert item.status == "Unverified"
-                found_reletive_references += 1
-        assert found_reletive_references == 2
+                found_relative_references += 1
+        assert found_relative_references == 2
         self.parser.set_export_mode("generic")
         
             
@@ -785,16 +811,6 @@ class TestTypeParsing(unittest.TestCase):
         assert result_2
         assert len(result_2) == 2
         
-    def _test_remove_bold_emphasis(self): 
-        stripped = self.parser._remove_bold_emphasis(TEST_REMOVE_BOLD_EMPHASIS)
-        assert stripped
-        self.assertIsInstance(stripped, list)
-        for item in stripped:
-            self.assertIsInstance(item, dict)
-            assert item.get("type")
-            assert item.get("raw")
-            self.assertNotEqual(item.get("type"), "strong")
-            self.assertNotEqual(item.get("type"), "emphasis")
             
     
         

@@ -61,7 +61,7 @@ class Md2DocBlock:
         self.export_mode = export_mode
         if export_mode == self.GENERIC_MODE: # Default behavior
             self.set_parser()
-        elif export_mode == self.ONE_NOTE_MODE: # Overrides image and link parsers to accomodate reletive references.
+        elif export_mode == self.ONE_NOTE_MODE: # Overrides image and link parsers to accommodate relative references.
             self.set_parser(DocBlockElementType.LINK, self._on_link)
             self.set_parser(DocBlockElementType.IMAGE, self._on_image)
         else:
@@ -304,8 +304,8 @@ class Md2DocBlock:
         image_block = self._image(token)
         
         try:
-            filename, extension = self._check_reletive(token)
-        except TypeError: # No reletive link found
+            filename, extension = self._check_relative(token)
+        except NotRelativeURIWarning: # No relative link found
             return image_block
         
         image_block.type = DocBlockElementType.RESOURCE_REFERENCE
@@ -343,8 +343,8 @@ class Md2DocBlock:
         link_blocks = self._link(token)
         
         try:
-            filename, extension = self._check_reletive(token)
-        except TypeError: # No reletive link found
+            filename, extension = self._check_relative(token)
+        except NotRelativeURIWarning: # No relative link found
             return link_blocks
         
         link_block = link_blocks[0]
@@ -574,7 +574,7 @@ class Md2DocBlock:
 
         return content
     
-    def _check_reletive(self, token: Dict[str, Any]):
+    def _check_relative(self, token: Dict[str, Any]):
         raw_uri = token.get("attrs").get("url")
         
         if not raw_uri:
@@ -585,9 +585,9 @@ class Md2DocBlock:
         if len(match) == 1:
             return os.path.splitext(match[0])
         elif len(match) == 0: 
-            return None
+            raise NotRelativeURIWarning(f"Provided token does not contain a relative URI: {token}")
         else:
-            raise InvalidTokenError(f"Reletive URI Regex found multiple matches in: {token}")
+            raise InvalidTokenError(f"Relative URI Regex found multiple matches in: {token}")
         
 class InvalidTokenError(Exception):
     def __init__(self, *args: object) -> None:
@@ -598,5 +598,9 @@ class NotMDFileError(Exception):
         super().__init__(*args)
         
 class InvalidExportMode(Exception):
+    def __init__(self, *args: object) -> None:
+        super().__init__(*args)
+        
+class NotRelativeURIWarning(Exception):
     def __init__(self, *args: object) -> None:
         super().__init__(*args)
