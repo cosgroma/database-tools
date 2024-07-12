@@ -3,7 +3,7 @@ from pprint import pprint
 
 
 from databasetools.models.block_model import DocBlockElement, DocBlockElementType
-from databasetools.adapters.oneNote.type_parsing import Md2DocBlock, NotMDFileError, InvalidTokenError, NotRelativeURIWarning
+from databasetools.adapters.oneNote.md2docBlock import Md2DocBlock, NotMDFileError, InvalidTokenError, NotRelativeURIWarning
 
 TEST_MD = '''
 
@@ -151,52 +151,146 @@ TEST_REMOVE_BOLD_EMPHASIS = [
     }
 ]
 
-class TestTypeParsing(unittest.TestCase):
+class TestMd2DocBlock(unittest.TestCase):
     def setUp(self):
         self.parser = Md2DocBlock()
         
-    def test_set_export_mode(self):
-        self.parser.reset()
+    def test_init(self):
+        assert self.parser.func_list
+        assert len(self.parser.func_list) == 18
+        assert isinstance(self.parser.func_list, dict)
+        assert self.parser.mode == self.parser.GENERIC_MODE
+        assert self.parser.ignored_token_types == [self.parser.TOKEN_TYPES["BLANK_LINE"]]
+    
+    def test_mode(self):
+        def_func_list = self.parser._default_func_list
         
-        orig_funcs = [func for func in self.parser._Md2DocBlock__func_list.values()] # Collect original functions
-        self.parser.set_export_mode(self.parser.ONE_NOTE_MODE)
+        # Test setter:
         
-        assert self.parser.export_mode == self.parser.ONE_NOTE_MODE
-        diff_count = 0
-        for func in orig_funcs:
-            if func not in self.parser._Md2DocBlock__func_list.values():
-                diff_count += 1
-
-        assert diff_count == 2
-        
-        self.parser.set_export_mode(self.parser.GENERIC_MODE)
-        
-        for func in orig_funcs:
-            assert func in self.parser._Md2DocBlock__func_list.values()
+        # Test setter protections
+        with self.assertRaises(AttributeError):
+            self.parser.mode = None
             
-    def test_set_parser(self):
-        self.parser.reset()
+        with self.assertRaises(AttributeError):
+            self.parser.mode = self.parser.USER_DEFINED_MODE
+            
+        # Check that function list is set correctly
+        self.parser.mode = self.parser.GENERIC_MODE 
+        assert self.parser.mode == self.parser.GENERIC_MODE
+        general_func_list = self.parser.func_list
+        for name in def_func_list:
+            assert def_func_list[name] == general_func_list[name]        
         
-        self.parser._Md2DocBlock__func_list = None
-        assert self.parser._Md2DocBlock__func_list == None
+        # Check changing modes sets function list correctly
+        self.parser.mode = self.parser.ONE_NOTE_MODE
+        assert self.parser.mode == self.parser.ONE_NOTE_MODE
+        on_func_list = self.parser.func_list
+        for name in def_func_list:
+            if name != DocBlockElementType.LINK and name != DocBlockElementType.IMAGE:
+                assert def_func_list[name] == on_func_list[name]
+        assert def_func_list[DocBlockElementType.LINK] != on_func_list[DocBlockElementType.LINK]
+        assert def_func_list[DocBlockElementType.IMAGE] != on_func_list[DocBlockElementType.IMAGE]
+        assert on_func_list[DocBlockElementType.LINK] == self.parser._on_link
+        assert on_func_list[DocBlockElementType.IMAGE] == self.parser._on_image
         
-        self.parser.set_parser()
-        assert self.parser._Md2DocBlock__func_list
+        # Test Getter:
         
-        def foo():
-            pass
+        # Ensure getter protects _mode attr
+        cur_mode = self.parser.mode
+        cur_mode = "BOGUS"
+        assert cur_mode != self.parser.mode
         
-        self.assertRaises(AttributeError, self.parser.set_parser, None, foo)
+    def test_func_list(self):
+        self.parser.mode = self.parser.GENERIC_MODE
         
-        self.parser.set_parser(DocBlockElementType.TEXT, foo)
-        assert self.parser._Md2DocBlock__func_list[DocBlockElementType.TEXT] == foo 
+        # Test getter:
         
-    def test_process_page(self):
-        no_md_path = "/thing/there/hello/file/file_with_no_md"
-        self.assertRaises(NotMDFileError, self.parser.process_page, no_md_path)
+        # Test getter protects _func_list
+        def_func_list = self.parser._default_func_list
+        func_list = self.parser.func_list
+        func_list.clear()
         
-        md_path = no_md_path + ".md"
-        self.assertRaises(FileNotFoundError, self.parser.process_page, md_path)
+        for name in def_func_list:
+            assert self.parser._func_list[name] == def_func_list[name]
+            
+        # Test setter:
+        
+        # Test setting
+        new_func_list = self.parser.func_list
+        for name in new_func_list:
+            new_func_list[name] = None
+            
+        self.parser.func_list = new_func_list
+        
+        for name in self.parser._func_list:
+            assert self.parser._func_list[name] == None
+            
+        # Test setter protects _func_list
+        def foo(): pass
+        
+        for name in new_func_list:
+            new_func_list[name] = foo
+            
+        for name in self.parser._func_list:
+            assert self.parser._func_list[name] == None
+            
+    def test_override_func(self):
+        self.parser.mode = self.parser.GENERIC_MODE
+        
+        def foo(): pass
+        self.parser.override_func_list(DocBlockElementType.LINK, foo)
+        assert self.parser.func_list[DocBlockElementType.LINK] == foo
+        
+        with self.assertRaises(AttributeError):
+            self.parser.override_func_list(None, foo)
+        
+        self.parser.override_func_list(DocBlockElementType.LINK, None)
+        assert self.parser.func_list[DocBlockElementType.LINK] == None    
+        
+    def test_trim_tokens(self):
+        # Test getter protections
+        tt = self.parser.ignored_token_types
+        assert len(tt) == 1
+        
+        tt.append("Hello there!")
+        assert len(self.parser.ignored_token_types) == 1
+        
+        # Test setter protections
+        tt = ["hi!"]
+        self.parser.ignored_token_types = tt
+        assert len(self.parser.ignored_token_types) == 2 # Should be two elements since we always ignore blank line types
+        
+        tt.append("some junk")
+        assert len(self.parser.ignored_token_types) == 2
+        assert self.parser.ignored_token_types[0] == "hi!"
+        
+        self.parser.ignored_token_types = None
+        assert len(self.parser.ignored_token_types) == 1 # Defaults to ignore blank lines
+        
+    def test_add_ignored_types(self):
+        test_list = ["t1", "t2", "t3"]
+        self.parser.add_ignored_types(test_list)
+        assert len(self.parser._ignored_token_types) == 4
+        
+        test_list[0] = "t0"
+        result_ignored_list = self.parser.ignored_token_types
+        for item in result_ignored_list:
+            assert item != "t0"
+            
+        self.parser.ignored_token_types = None
+        
+    def test_remove_ignored_types(self):
+        self.parser.remove_ignored_types([self.parser.TOKEN_TYPES["BLANK_LINE"]])
+        assert len(self.parser._ignored_token_types) == 0
+        
+        self.parser.ignored_token_types = None
+        assert len(self.parser.ignored_token_types) == 1
+        
+        self.parser.remove_ignored_types(self.parser.TOKEN_TYPES["BLANK_LINE"])
+        assert len(self.parser._ignored_token_types) == 0
+        
+        # make sure it don't do nothing if removing types that are not present
+        self.parser.remove_ignored_types(["attempting", "to", "remove", "types", "not", "in", "list"])
         
     def test_md_to_token(self):
         token_list = self.parser.md_to_token(TEST_MD)
@@ -208,25 +302,6 @@ class TestTypeParsing(unittest.TestCase):
             self.assertNotEqual(item.get("type"), None)
             
         # pprint(token_list, sort_dicts=False)
-    
-    def test_make_block(self):
-        invalid_input = {
-            "type": "poopoo", 
-            'attrs': {
-                'level': 1
-            },
-            'style': 'axt',
-            'children': [
-                    {
-                        'type': 'text', 
-                        'raw': 'Heading 1'
-                    }
-            ]
-        }
-        self.assertRaises(KeyError, self.parser.make_block, invalid_input)
-        
-        null_result = self.parser.make_block(None)
-        assert not null_result
         
     def test_text(self):
         test_text = {
@@ -449,7 +524,7 @@ class TestTypeParsing(unittest.TestCase):
                 "url": "../../../../resources/23874923749723.hello"
             }
         }
-        self.parser.set_export_mode("one_note")
+        self.parser.mode = self.parser.ONE_NOTE_MODE
         
         result = self.parser._on_link(test_on_link)
         assert result
@@ -466,7 +541,7 @@ class TestTypeParsing(unittest.TestCase):
                 found_relative_references += 1
         assert found_relative_references == 2
         
-        self.parser.set_export_mode("generic")
+        self.parser.mode = self.parser.GENERIC_MODE
         
             
     def test_paragraph(self):
@@ -851,7 +926,7 @@ class TestTypeParsing(unittest.TestCase):
             ]}
         ]
         
-        result = self.parser._remove_elements_of_type(test_token_list, self.parser.trim_tokens)
+        result = self.parser._remove_elements_of_type(test_token_list, self.parser._ignored_token_types)
         block_list = self.parser.make_blocks(result)
         for block in block_list:
             assert block.type != None

@@ -1,22 +1,36 @@
 import mistune
 import os
-import frontmatter
 import re
 
 from mistune.plugins.table import table
-from typing import List, Dict, Any, Union, Tuple, Callable
+from typing import List, Dict, Any, Optional, Tuple, Callable, Union
 from bson import ObjectId
-from pathlib import Path
 from builtins import Exception
-import uuid
 
 from databasetools.models.block_model import DocBlockElement, DocBlockElementType
 
 VALID_METADATA_VALUES = ["title", "id", "oneNoteId", "oneNotePath", "updated", "created"]
 
 class Md2DocBlock:
+    """Class for converting Markdown into DocBlockElements.
+
+    Raises:
+        AttributeError: _description_
+        AttributeError: _description_
+        Exception: _description_
+        KeyError: _description_
+        InvalidTokenError: _description_
+        InvalidTokenError: _description_
+        InvalidTokenError: _description_
+        AttributeError: _description_
+        NotRelativeURIWarning: _description_
+
+    Returns:
+        _type_: _description_
+    """
     GENERIC_MODE = "generic"
     ONE_NOTE_MODE = "one_note"
+    USER_DEFINED_MODE = "user_defined"
     TOKEN_TYPES = {
         # Raw string representation of each token type key given by mistune
         "TEXT": "text",
@@ -50,33 +64,8 @@ class Md2DocBlock:
         "BLANK_LINE": "blank_line",
     }
     
-    def __init__(self, export_mode: str = GENERIC_MODE):
-        self.export_mode = export_mode
-        self.trim_tokens = [self.TOKEN_TYPES["BLANK_LINE"]]
-        self.set_parser() # Sets token parsing function list
-        self.set_export_mode(self.export_mode)
-        
-    
-    def set_home_dir(self, dir_path: Union[Path, str]):
-        self.home_dir_path = Path(dir_path)
-        self.home_dir_name = os.path.basename(self.home_dir_path)
-    
-    def reset(self):
-        self.__init__()
-        
-    def set_export_mode(self, export_mode: str = GENERIC_MODE):
-        self.export_mode = export_mode
-        if export_mode == self.GENERIC_MODE: # Default behavior
-            self.set_parser()
-        elif export_mode == self.ONE_NOTE_MODE: # Overrides image and link parsers to accommodate relative references.
-            self.set_parser(DocBlockElementType.LINK, self._on_link)
-            self.set_parser(DocBlockElementType.IMAGE, self._on_image)
-        else:
-            raise InvalidExportMode(f"Cannot set export mode to {export_mode}.")
-            
-    def set_parser(self, token_parser_type: DocBlockElementType = None, token_parser_callable: Callable = None):
-        if not token_parser_type and not token_parser_callable:
-            self.__func_list = {
+    def __init__(self, add_trim_tokens: Optional[List[str]] = None, mode_set: Optional[str] = GENERIC_MODE):
+        self._default_func_list = {
                 # Atomic types, No Children
                 DocBlockElementType.TEXT: self._text,
                 DocBlockElementType.HEADING: self._heading,
@@ -102,121 +91,203 @@ class Md2DocBlock:
                 # HTML types
                 DocBlockElementType.BLOCK_HTML: self._block_html
             }
-        elif not token_parser_type:
-            raise AttributeError("No token parser type given to override.")
+        self.func_list = self._default_func_list
+        
+        self._ignored_token_types = [self.TOKEN_TYPES["BLANK_LINE"]]
+        if add_trim_tokens:
+            self.add_ignored_types(add_trim_tokens)
+        
+        self.mode = mode_set
+        
+    @property
+    def mode(self):
+        return self._mode
+    
+    @mode.setter
+    def mode(self, mode_to_set: str):
+        if mode_to_set == self.GENERIC_MODE:
+            self._mode = self.GENERIC_MODE
+            self._func_list = self._default_func_list.copy()
+        elif mode_to_set == self.ONE_NOTE_MODE:
+            self._func_list = self._default_func_list.copy()
+            self.override_func_list(DocBlockElementType.LINK, self._on_link)
+            self.override_func_list(DocBlockElementType.IMAGE, self._on_image)
+            self._mode = self.ONE_NOTE_MODE
         else:
-            self.__func_list[token_parser_type] = token_parser_callable
+            raise AttributeError(f"Invalid mode: {mode_to_set}")
+        
+    @property
+    def func_list(self):
+        """Shallow copy of parser list.
+
+        Returns:
+            Dict[TOKEN_TYPES, Callable]: A string-callable dictionary for each token type specified in Md2DocBlock.TOKEN_TYPES
+        """
+        return self._func_list.copy()
+    
+    @func_list.setter
+    def func_list(self, set_func_list: Dict[DocBlockElementType, Callable]):
+        self._func_list = set_func_list.copy()
+    
+    def override_func_list(self, token_parser_type: DocBlockElementType, token_parser_callable: Callable):
+        """Sets the parse functions for each potential token type encountered in a markdown file. 
+
+        Args:
+            token_parser_type (Optional[DocBlockElementType]): Name of the token type to override or replace
+            token_parser_callable (Optional[Callable]): Callable to replace the parser for a token type of token_parser_type.
+
+        Raises:
+            AttributeError: No parser type specified to override. 
+        """
+        if not token_parser_type and token_parser_callable:
+            raise AttributeError(f"No token parser type given to override with {token_parser_callable}.")
+        else:
+            self._func_list[token_parser_type] = token_parser_callable
+            self._mode = self.USER_DEFINED_MODE
+    
+    @property
+    def ignored_token_types(self):
+        return self._ignored_token_types.copy()
+    
+    @ignored_token_types.setter
+    def ignored_token_types(self, token_types: List[str]):
+        if not token_types:
+            self._ignored_token_types = [self.TOKEN_TYPES["BLANK_LINE"]]
+        else:
+            self._ignored_token_types = token_types.copy()
+            if not self.TOKEN_TYPES["BLANK_LINE"] in token_types:
+                self._ignored_token_types.append(self.TOKEN_TYPES["BLANK_LINE"])
             
-    def process_page(self, file_path: Union[Path, str]) -> List[DocBlockElement]:
-        file_path = Path(file_path)
+    def add_ignored_types(self, token_types: List[str]):
+        for item in token_types:
+            if not item in self._ignored_token_types and item:
+                self._ignored_token_types.append(item)
+
+    def remove_ignored_types(self, token_types: Union[List[str], str]):
+        if isinstance(token_types, str):
+            if token_types in self._ignored_token_types:
+                self._ignored_token_types.remove(token_types)
+        elif isinstance(token_types, list):
+            for item in token_types:
+                if item in self._ignored_token_types:
+                    self._ignored_token_types.remove(item)
+
+    # def process_page(self, file_path: Union[Path, str]) -> List[DocBlockElement]:
+    #     file_path = Path(file_path)
         
-        if file_path.suffix != ".md":
-            raise NotMDFileError(f"File: {file_path} does not have a .md extension.") 
-        elif not os.path.exists(file_path): 
-            raise FileNotFoundError(f"The provided path: {file_path} does not exists.")
-        elif not os.path.isfile(file_path):
-            raise IsADirectoryError(f"The provided path: {file_path} is a directory. Use process_dir instead.")
+    #     if file_path.suffix != ".md":
+    #         raise NotMDFileError(f"File: {file_path} does not have a .md extension.") 
+    #     elif not os.path.exists(file_path): 
+    #         raise FileNotFoundError(f"The provided path: {file_path} does not exists.")
+    #     elif not os.path.isfile(file_path):
+    #         raise IsADirectoryError(f"The provided path: {file_path} is a directory. Use process_dir instead.")
         
-        with open(file_path, "r") as f:
-            metadata, md = frontmatter.parse(f.read())
+    #     with open(file_path, "r") as f:
+    #         metadata, md = frontmatter.parse(f.read())
             
-        relative_path = os.path.relpath(file_path, self.home_dir_path)
+    #     relative_path = os.path.relpath(file_path, self._home_dir_path)
         
-        # Markdown Extraction and conversion to DocBlockElements
+    def md2docblock(self, md: str) -> Tuple[List[DocBlockElement], List[ObjectId]]:
+        """Processes a string of Markdown and returns a list DocBlockElements along with a list of id's of the highest level DocBlockElements in the list.
+
+        Args:
+            md (str): Raw Markdown formatted string.
+
+        Returns:
+            Tuple[List[DocBlockElement], List[ObjectId]]: The first element is a list of DocBlockElements generated according to the raw markdown. The second list 
+            is a list of ObjectId's of the highest level DocBlockElements from the Markdown string. 
+        """
         token_list = self.md_to_token(md)
-        page_block_list = self.make_blocks(token_list)
-        id_list = [block.id for block in page_block_list]
-        page_block_list.insert(0, DocBlockElement(
-            type=DocBlockElementType.PAGE,
-            children=id_list
-        ))
+        id_list = []
+        block_list = []
+        for item in token_list:
+            new_blocks = self.make_blocks([item])
+            new_block_parent_id = new_blocks[0].id
+            id_list.append(new_block_parent_id)
+            block_list.extend(new_blocks)
+        return block_list, id_list
         
-        if self.export_mode == self.GENERIC_MODE:
-            page_block_list = self._process_generic_page(page_block_list, metadata)
-        elif self.export_mode == self.ONE_NOTE_MODE:
-            page_block_list = self._process_oneNote_page(page_block_list, metadata)
-        else:
-            raise AttributeError(f"Invalid attribute: {self.export_mode}, when trying to blockify: {file_path}")
+    # def _process_generic_page(self, block_list: List[DocBlockElement], metadata: Dict[str, Any]) -> List[DocBlockElement]: #move?
+    #     page_block = block_list[0]
+    #     page_block.block_attr["frontmatter"] = metadata
+    #     page_block.tags = [self.GENERIC_MODE]
+    #     return block_list
         
-        page_block = page_block_list[0]
-        page_block.block_attr["notebook_name"] = str(self.home_dir_name)
-        page_block.block_attr["note_path"] = str(relative_path)
-        page_block.block_attr["file_name"] = os.path.splitext(os.path.basename(file_path))[0]
+    # def _process_oneNote_page(self, block_list: List[DocBlockElement], metadata: Dict[str, Any]) -> List[DocBlockElement]: # move?
+    #     # OneNote export frontmatter has these fields
+    #     # "metadata": {
+    #     #     "title": "Platform Library",
+    #     #     "id": "27bd2f39d4cc4017b64bc9b26645e0d5",
+    #     #     "oneNoteId": "{DDD92369-7933-0FFD-3970-C986A571D816}{1}{E1838393364313073899420146992507433720312551}",
+    #     #     "oneNotePath": null,
+    #     #     "updated": "2021-01-25 18:16:06-08:00",
+    #     #     "created": "2021-01-25 18:15:19-08:00"
+    #     # }
         
-        return page_block_list
+    #     # oneNote_id_pattern = r"^{(.+)}{.}{(.+)}$"
+    #     # on_id = metadata.get("oneNoteId")
+    #     # match = re.match(oneNote_id_pattern, on_id)
+    #     # section_id, other_id = match.groups()
+    #     # page_id = str(uuid.UUID(hex=metadata.get("id"))).upper()
         
-    def _process_generic_page(self, block_list: List[DocBlockElement], metadata: Dict[str, Any]) -> List[DocBlockElement]:
-        page_block = block_list[0]
-        page_block.block_attr["frontmatter"] = metadata
-        page_block.tags = [self.GENERIC_MODE]
-        return block_list
-        
-    def _process_oneNote_page(self, block_list: List[DocBlockElement], metadata: Dict[str, Any]) -> List[DocBlockElement]: 
-        # OneNote export frontmatter has these fields
-        # "metadata": {
-        #     "title": "Platform Library",
-        #     "id": "27bd2f39d4cc4017b64bc9b26645e0d5",
-        #     "oneNoteId": "{DDD92369-7933-0FFD-3970-C986A571D816}{1}{E1838393364313073899420146992507433720312551}",
-        #     "oneNotePath": null,
-        #     "updated": "2021-01-25 18:16:06-08:00",
-        #     "created": "2021-01-25 18:15:19-08:00"
-        # }
-        
-        # oneNote_id_pattern = r"^{(.+)}{.}{(.+)}$"
-        # on_id = metadata.get("oneNoteId")
-        # match = re.match(oneNote_id_pattern, on_id)
-        # section_id, other_id = match.groups()
-        # page_id = str(uuid.UUID(hex=metadata.get("id"))).upper()
-        
-        page_block = block_list[0]
-        page_block.name = str(metadata.get("title"))
-        page_block.block_attr = {
-            "oneNote_page_id": metadata.get("id"),
-            "oneNoteId": metadata.get("oneNoteId"),
-            # "oneNote_page_id": page_id,
-            # "oneNote_section_id": section_id,
-            # "oneNote_id": other_id,
-            "oneNote_created_at": metadata.get("created"),
-            "oneNote_modified_at": metadata.get("updated"),
-            "oneNote_path": metadata.get("oneNotePath")
-        }
-        page_block.tags = [self.ONE_NOTE_MODE]
-        return block_list
+    #     page_block = block_list[0]
+    #     page_block.name = str(metadata.get("title"))
+    #     page_block.block_attr = {
+    #         "oneNote_page_id": metadata.get("id"),
+    #         "oneNoteId": metadata.get("oneNoteId"),
+    #         # "oneNote_page_id": page_id,
+    #         # "oneNote_section_id": section_id,
+    #         # "oneNote_id": other_id,
+    #         "oneNote_created_at": metadata.get("created"),
+    #         "oneNote_modified_at": metadata.get("updated"),
+    #         "oneNote_path": metadata.get("oneNotePath")
+    #     }
+    #     page_block.tags = [self.ONE_NOTE_MODE]
+    #     return block_list
         
     def md_to_token(self, raw_md: str) -> List[Dict[str, Any]]:
-        '''
-            Parses markdown into python tokens using mistune.
-        '''
+        """Parses a raw Markdown string into python tokens.
+
+        Args:
+            raw_md (str): Raw string formatted in Markdown.
+
+        Returns:
+            List[Dict[str, Any]]: An Markdown AST generated by mistune.
+        """
         bp = mistune.BlockParser(max_nested_level=10) # Instantiate a new block parser to a predefined max nesting level
         markdown = mistune.Markdown(renderer=None, block=bp, plugins=[table]) # renderer=None allows parsing to python tokens. Import other plugins as needed
         token_list = markdown(raw_md) 
         token_list = self._simplify_token_list(token_list)
-        return self._remove_elements_of_type(token_list, self.trim_tokens)
-        
-    def make_block(self, token: Dict[str, Any]):
-        '''
-            Checks the type of the input then calls the corresponding function from the function list.
-            May return one DocBlockElement or a list of DocBlockElements 
-        '''
-        if not token:
-            return None
-        
-        type = token["type"]
-        if type in self.__func_list:
-            try:
-                return self.__func_list[type](token)
-            except Exception as e:
-                raise Exception(f"Trying to add token: {token}") from e
-        else:   
-            raise KeyError(f"Invalid object type: {type} not in function list, in object: {token}")
+        return self._remove_elements_of_type(token_list, self._ignored_token_types)
     
     def make_blocks(self, token_list: List[Dict[str, Any]]) -> List[DocBlockElement]:
-        '''
-            Repeatedly calls the make_block method to make a list of DocBlockElements from a list of tokens. 
-        '''
+        """Generates DocBlockElements from Markdown python tokens while maintaining block hierarchy with children list relation in each parent DocBlockElement.
+
+        Args:
+            token_list (List[Dict[str, Any]]): An Markdown AST from md_to_token.
+
+        Raises:
+            Exception: Re-raises exceptions from generating DocBlockElements with a description of the token make_blocks tried to parse.
+            KeyError: When a Markdown token is passed in with an invalid type.
+
+        Returns:
+            List[DocBlockElement]: A list of DocBlockElements generated from token_list.
+        """
         block_list = []
         for item in token_list:
-            new_block = self.make_block(item)
+            
+            if not item:
+                return None
+        
+            type = item["type"]
+            if type in self._func_list:
+                try:
+                    new_block = self._func_list[type](item)
+                except Exception as e:
+                    raise Exception(f"Trying to add token: {item}") from e
+            else:   
+                raise KeyError(f"Invalid object type: {type} not in function list, in object: {item}")
+            
             if isinstance(new_block, list):
                 block_list.extend(new_block)
             else:
@@ -226,11 +297,14 @@ class Md2DocBlock:
     
     # Atomic types
     def _text(self, token: Dict[str, Any]) -> DocBlockElement:
-        '''
-            type: "text"
-            block_content: Attempts to get the raw content of the token. 
-        '''
-        
+        """Generates a DocBlockElement for a token of type "text".
+
+        Args:
+            token (Dict[str, Any]): Should be a token with type: "text". 
+
+        Returns:
+            DocBlockElement: .type="text", .block_content="Raw text of the text token"
+        """
         raw_content = token.get("raw")
         if not raw_content: # Don't make text docblocks that are empty
             return None
@@ -318,6 +392,14 @@ class Md2DocBlock:
         )
         
     def _on_image(self, token: Dict[str, Any]) -> DocBlockElement:
+        """Image parser for one
+
+        Args:
+            token (Dict[str, Any]): this is sick
+
+        Returns:
+            DocBlockElement: _description_
+        """
         image_block = self._image(token)
         
         try:
@@ -652,7 +734,7 @@ class Md2DocBlock:
             elif isinstance(item, dict):
                 item = self.deep_copy_token(item)
         return new_list
-                   
+
 class InvalidTokenError(Exception):
     def __init__(self, *args: object) -> None:
         super().__init__(*args)
