@@ -8,6 +8,8 @@ from typing import List, Dict, Any, Union, Tuple, Callable
 from bson import ObjectId
 from pathlib import Path
 from builtins import Exception
+import uuid
+
 from databasetools.models.block_model import DocBlockElement, DocBlockElementType
 
 VALID_METADATA_VALUES = ["title", "id", "oneNoteId", "oneNotePath", "updated", "created"]
@@ -15,7 +17,6 @@ VALID_METADATA_VALUES = ["title", "id", "oneNoteId", "oneNotePath", "updated", "
 class Md2DocBlock:
     GENERIC_MODE = "generic"
     ONE_NOTE_MODE = "one_note"
-    
     TOKEN_TYPES = {
         # Raw string representation of each token type key given by mistune
         "TEXT": "text",
@@ -51,9 +52,15 @@ class Md2DocBlock:
     
     def __init__(self, export_mode: str = GENERIC_MODE):
         self.export_mode = export_mode
+        self.trim_tokens = [self.TOKEN_TYPES["BLANK_LINE"]]
         self.set_parser() # Sets token parsing function list
         self.set_export_mode(self.export_mode)
         
+    
+    def set_home_dir(self, dir_path: Union[Path, str]):
+        self.home_dir_path = Path(dir_path)
+        self.home_dir_name = os.path.basename(self.home_dir_path)
+    
     def reset(self):
         self.__init__()
         
@@ -69,7 +76,7 @@ class Md2DocBlock:
             
     def set_parser(self, token_parser_type: DocBlockElementType = None, token_parser_callable: Callable = None):
         if not token_parser_type and not token_parser_callable:
-            self.func_list = {
+            self.__func_list = {
                 # Atomic types, No Children
                 DocBlockElementType.TEXT: self._text,
                 DocBlockElementType.HEADING: self._heading,
@@ -98,7 +105,7 @@ class Md2DocBlock:
         elif not token_parser_type:
             raise AttributeError("No token parser type given to override.")
         else:
-            self.func_list[token_parser_type] = token_parser_callable
+            self.__func_list[token_parser_type] = token_parser_callable
             
     def process_page(self, file_path: Union[Path, str]) -> List[DocBlockElement]:
         file_path = Path(file_path)
@@ -112,6 +119,8 @@ class Md2DocBlock:
         
         with open(file_path, "r") as f:
             metadata, md = frontmatter.parse(f.read())
+            
+        relative_path = os.path.relpath(file_path, self.home_dir_path)
         
         # Markdown Extraction and conversion to DocBlockElements
         token_list = self.md_to_token(md)
@@ -130,7 +139,8 @@ class Md2DocBlock:
             raise AttributeError(f"Invalid attribute: {self.export_mode}, when trying to blockify: {file_path}")
         
         page_block = page_block_list[0]
-        page_block.block_attr["local_path"] = str(file_path)
+        page_block.block_attr["notebook_name"] = str(self.home_dir_name)
+        page_block.block_attr["note_path"] = str(relative_path)
         page_block.block_attr["file_name"] = os.path.splitext(os.path.basename(file_path))[0]
         
         return page_block_list
@@ -152,12 +162,20 @@ class Md2DocBlock:
         #     "created": "2021-01-25 18:15:19-08:00"
         # }
         
-        # Metadata updates
+        # oneNote_id_pattern = r"^{(.+)}{.}{(.+)}$"
+        # on_id = metadata.get("oneNoteId")
+        # match = re.match(oneNote_id_pattern, on_id)
+        # section_id, other_id = match.groups()
+        # page_id = str(uuid.UUID(hex=metadata.get("id"))).upper()
+        
         page_block = block_list[0]
         page_block.name = str(metadata.get("title"))
         page_block.block_attr = {
-            "oneNote_pageid": metadata.get("id"),
+            "oneNote_page_id": metadata.get("id"),
             "oneNoteId": metadata.get("oneNoteId"),
+            # "oneNote_page_id": page_id,
+            # "oneNote_section_id": section_id,
+            # "oneNote_id": other_id,
             "oneNote_created_at": metadata.get("created"),
             "oneNote_modified_at": metadata.get("updated"),
             "oneNote_path": metadata.get("oneNotePath")
@@ -169,12 +187,11 @@ class Md2DocBlock:
         '''
             Parses markdown into python tokens using mistune.
         '''
-        remove_types = [self.TOKEN_TYPES["BLANK_LINE"], None] # Add elements here if you need to trim the parsing
         bp = mistune.BlockParser(max_nested_level=10) # Instantiate a new block parser to a predefined max nesting level
         markdown = mistune.Markdown(renderer=None, block=bp, plugins=[table]) # renderer=None allows parsing to python tokens. Import other plugins as needed
         token_list = markdown(raw_md) 
         token_list = self._simplify_token_list(token_list)
-        return self._remove_elements_of_type(token_list, remove_types)
+        return self._remove_elements_of_type(token_list, self.trim_tokens)
         
     def make_block(self, token: Dict[str, Any]):
         '''
@@ -185,9 +202,9 @@ class Md2DocBlock:
             return None
         
         type = token["type"]
-        if type in self.func_list:
+        if type in self.__func_list:
             try:
-                return self.func_list[type](token)
+                return self.__func_list[type](token)
             except Exception as e:
                 raise Exception(f"Trying to add token: {token}") from e
         else:   
@@ -304,7 +321,7 @@ class Md2DocBlock:
         image_block = self._image(token)
         
         try:
-            filename, extension = self._check_relative(token)
+            filename, extension = self._on_check_relative(token)
         except NotRelativeURIWarning: # No relative link found
             return image_block
         
@@ -343,7 +360,7 @@ class Md2DocBlock:
         link_blocks = self._link(token)
         
         try:
-            filename, extension = self._check_relative(token)
+            filename, extension = self._on_check_relative(token)
         except NotRelativeURIWarning: # No relative link found
             return link_blocks
         
@@ -451,7 +468,7 @@ class Md2DocBlock:
         ))
         return block_list
         
-    def _make_table_element(self, token: Dict[str, Any], element_type: str) -> List[DocBlockElement]:
+    def _make_table_element(self, token: Dict[str, Any], element_type: DocBlockElementType) -> List[DocBlockElement]:
         block_list, _, id_list = self._get_children_block_elements(token)
         block_list.insert(0, DocBlockElement(
             type=element_type,
@@ -459,7 +476,7 @@ class Md2DocBlock:
         ))
         return block_list
     
-    def _block_html(self, token: Dict[str, Any]) -> List[DocBlockElement]:
+    def _block_html(self, token: Dict[str, Any]) -> DocBlockElement:
         return DocBlockElement(
             type=DocBlockElementType.BLOCK_HTML,
             block_content=token["raw"]
@@ -468,11 +485,20 @@ class Md2DocBlock:
     def _strip_inline_HTML(self, token_list: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         new_token_list = []
         for token in token_list:
-            if token["type"] != self.TOKEN_TYPES["INLINE_HTML"]:
-                new_token_list.append(token)
+            if token["type"] == self.TOKEN_TYPES["INLINE_HTML"]:
+                new_token = {
+                    "type": self.TOKEN_TYPES["TEXT"],
+                    "raw": token["raw"]
+                }
+                new_token_list.append(new_token)
+            else:
+                new_token_list.append(self.deep_copy_token(token))
         return new_token_list
 
     def _get_children_block_elements(self, token: Dict[str, Any]) -> Tuple[List[DocBlockElement], str, List[ObjectId]]:
+        if not token:
+            return ([], "", [])
+        
         if not token.get("children"):
             return ([], "", [])
         
@@ -484,11 +510,26 @@ class Md2DocBlock:
     
     def _remove_elements_of_type(self, token_list: List[Dict[str, Any]], remove_types: List[Any]) -> List[Dict[str, Any]]:
         cleaned_list: List[Dict[str, Any]] = []
-        for item in token_list:
-            if not item["type"] in remove_types:
-                if item.get("children"):
-                    item["children"] = self._remove_elements_of_type(item.get("children"), remove_types)
-                cleaned_list.append(item)
+        for token in token_list:
+            if not token["type"]:
+                continue # Don't append to new list
+            
+            if token["type"] in remove_types:
+                continue # Don't append to new list
+            
+            # Do this if the type is valid
+            new_token = token.copy()
+            
+            if token.get("children"):
+                new_child_list = self._remove_elements_of_type(token.get("children"), remove_types)
+                new_token["children"] = new_child_list
+                
+            if attrs := token.get("attrs"):
+                new_attrs = self.deep_copy_token(attrs)
+                token["attrs"] = new_attrs
+
+            cleaned_list.append(new_token)
+                
         return cleaned_list
 
     def _token_list2str(self, token_list: List[dict]) -> str:
@@ -501,22 +542,15 @@ class Md2DocBlock:
             the element including all it's descendants. 
         '''
         content = ""
-        to_add = ""
         for item in token_list:
             if item["type"] == self.TOKEN_TYPES["SOFTBREAK"]:
                 content += " "
-                continue
             elif item["type"] == self.TOKEN_TYPES["LINEBREAK"]:
                 content += "\n"
-                continue
-
-            if item.get("raw"):
-                to_add = item["raw"]
-            else:
-                if item.get("children"):
-                    to_add = self._token_list2str(item["children"])
-            
-            content += to_add
+            elif item.get("raw"):
+                content += item["raw"]
+            elif item.get("children"):
+                content += self._token_list2str(item["children"])
         return content
     
     def _simplify_token_list(self, token_list: List[Dict[str, Any]]) -> List[Dict[str, Any]]: 
@@ -527,37 +561,51 @@ class Md2DocBlock:
         if not token_list:
             return None
         
-        for token in token_list:
-            if token["type"] == self.TOKEN_TYPES["STRONG"] or token["type"] == self.TOKEN_TYPES["EMPHASIS"]: 
-                token["raw"] = self._remove_bold_emphasis([token]) 
-                token["type"] = self.TOKEN_TYPES["TEXT"]
-                token.pop("children")
-        
-        token_list = self._strip_inline_HTML(token_list)
-
         new_token_list: List[Dict[str, Any]] = []
         
-        content = ""
         for token in token_list:
-            if token["type"] == self.TOKEN_TYPES["TEXT"] or token["type"] == self.TOKEN_TYPES["CODESPAN"]:
+            if token["type"] == self.TOKEN_TYPES["STRONG"] or token["type"] == self.TOKEN_TYPES["EMPHASIS"]: 
+                new_token = {
+                    "type": self.TOKEN_TYPES["TEXT"],
+                    "raw": self._extract_bold_emphasis_content([token])
+                }
+                new_token_list.append(new_token)
+            else:
+                new_token_list.append(self.deep_copy_token(token))
+                
+        new_token_list = self._strip_inline_HTML(new_token_list)
+        
+        final_list: List[Dict[str, Any]] = []
+        content = ""
+        for token in new_token_list:
+            if token["type"] == self.TOKEN_TYPES["TEXT"]:
                 content += token["raw"]
+            elif token["type"] == self.TOKEN_TYPES["CODESPAN"]:
+                content += f"""`{token["raw"]}`"""
             elif token["type"] == self.TOKEN_TYPES["LINEBREAK"]:
                 content += "\n"
             elif token["type"] == self.TOKEN_TYPES["SOFTBREAK"]:
                 content += " "
             else:
                 if content:
-                    new_token_list.append({"type": self.TOKEN_TYPES["TEXT"], "raw": content})
+                    final_list.append({"type": self.TOKEN_TYPES["TEXT"], "raw": content})
                     content = ""
-                new_token_list.append(token)
+                final_list.append(self.deep_copy_token(token))
                 
         if content:
-            new_token_list.append({"type": self.TOKEN_TYPES["TEXT"], "raw": content})
-        return new_token_list
+            final_list.append({"type": self.TOKEN_TYPES["TEXT"], "raw": content})
+        return final_list
     
-    def _remove_bold_emphasis(self, token_list: List[Dict[str, Any]]) -> str: 
+    def _extract_bold_emphasis_content(self, token_list: List[Dict[str, Any]]) -> str: 
+        '''
+            This is a helper function and should only be called by _simplify_token_list
+        '''
         content = ""
+        allowed_types = [self.TOKEN_TYPES["STRONG"], self.TOKEN_TYPES["EMPHASIS"], self.TOKEN_TYPES["TEXT"]]
         for token in token_list:
+            if not token["type"] in allowed_types:
+                raise InvalidTokenError(f"Token: {token} cannot be simplified with {self._extract_bold_emphasis_content}")
+            
             raw = token.get("raw")
             child_list = token.get("children")
                                 
@@ -565,7 +613,7 @@ class Md2DocBlock:
                 content += raw
 
             if child_list:
-                content += self._remove_bold_emphasis(child_list)
+                content += self._extract_bold_emphasis_content(child_list)
         
             if token["type"] == self.TOKEN_TYPES["STRONG"]:
                 content = f"**{content}**"
@@ -574,21 +622,37 @@ class Md2DocBlock:
 
         return content
     
-    def _check_relative(self, token: Dict[str, Any]):
+    def _on_check_relative(self, token: Dict[str, Any]):
         raw_uri = token.get("attrs").get("url")
         
         if not raw_uri:
             raise AttributeError(f"No url field in this token: {token}.")
         
-        path_pattern = r"^(?:\.\.\/)*resources\/(.*\..*)$"
-        match = re.findall(path_pattern, raw_uri)
-        if len(match) == 1:
-            return os.path.splitext(match[0])
-        elif len(match) == 0: 
-            raise NotRelativeURIWarning(f"Provided token does not contain a relative URI: {token}")
+        path_pattern = r"^(?:\.\.\/)*resources\/(.*)$"
+        match = re.match(path_pattern, raw_uri)
+        if match:
+            return os.path.splitext(match.group(1))
         else:
-            raise InvalidTokenError(f"Relative URI Regex found multiple matches in: {token}")
+            raise NotRelativeURIWarning(f"Provided token does not contain a relative URI for a oneNote Export: {token}")
+    
+    def deep_copy_token(self, token: Dict[str, Any]) -> Dict[str, Any]:
+        new_token = token.copy()
+        for attr in new_token:
+            if isinstance(token[attr], list):
+                new_token[attr] = self.deep_copy_token_list(token[attr])
+            elif isinstance(token[attr], dict):
+                new_token[attr] = self.deep_copy_token(token[attr])
+        return new_token
         
+    def deep_copy_token_list(self, token_list: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        new_list = token_list.copy()
+        for item in new_list:
+            if isinstance(item, list):
+                item = self.deep_copy_token_list(item)
+            elif isinstance(item, dict):
+                item = self.deep_copy_token(item)
+        return new_list
+                   
 class InvalidTokenError(Exception):
     def __init__(self, *args: object) -> None:
         super().__init__(*args)

@@ -29,7 +29,9 @@ class OneNoteTools:
                 self.store_resources(os.path.join(dir_path, "resources"))
             else:
                 self.parser.set_export_mode("one_note")
-                missed_files = self.upload_dir(os.path.join(dir_path, item))
+                raw_path = os.path.join(dir_path, item)
+                self.parser.set_home_dir(raw_path)
+                missed_files = self.upload_dir(raw_path)
                 self.parser.set_export_mode()
         
         return missed_files

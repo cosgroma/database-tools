@@ -3,7 +3,7 @@ from pprint import pprint
 
 
 from databasetools.models.block_model import DocBlockElement, DocBlockElementType
-from databasetools.adapters.oneNote.type_parsing import Md2DocBlock, NotMDFileError, InvalidTokenError
+from databasetools.adapters.oneNote.type_parsing import Md2DocBlock, NotMDFileError, InvalidTokenError, NotRelativeURIWarning
 
 TEST_MD = '''
 
@@ -158,13 +158,13 @@ class TestTypeParsing(unittest.TestCase):
     def test_set_export_mode(self):
         self.parser.reset()
         
-        orig_funcs = [func for func in self.parser.func_list.values()] # Collect original functions
+        orig_funcs = [func for func in self.parser._Md2DocBlock__func_list.values()] # Collect original functions
         self.parser.set_export_mode(self.parser.ONE_NOTE_MODE)
         
         assert self.parser.export_mode == self.parser.ONE_NOTE_MODE
         diff_count = 0
         for func in orig_funcs:
-            if func not in self.parser.func_list.values():
+            if func not in self.parser._Md2DocBlock__func_list.values():
                 diff_count += 1
 
         assert diff_count == 2
@@ -172,16 +172,16 @@ class TestTypeParsing(unittest.TestCase):
         self.parser.set_export_mode(self.parser.GENERIC_MODE)
         
         for func in orig_funcs:
-            assert func in self.parser.func_list.values()
+            assert func in self.parser._Md2DocBlock__func_list.values()
             
     def test_set_parser(self):
         self.parser.reset()
         
-        self.parser.func_list = None
-        assert self.parser.func_list == None
+        self.parser._Md2DocBlock__func_list = None
+        assert self.parser._Md2DocBlock__func_list == None
         
         self.parser.set_parser()
-        assert self.parser.func_list
+        assert self.parser._Md2DocBlock__func_list
         
         def foo():
             pass
@@ -189,7 +189,7 @@ class TestTypeParsing(unittest.TestCase):
         self.assertRaises(AttributeError, self.parser.set_parser, None, foo)
         
         self.parser.set_parser(DocBlockElementType.TEXT, foo)
-        assert self.parser.func_list[DocBlockElementType.TEXT] == foo 
+        assert self.parser._Md2DocBlock__func_list[DocBlockElementType.TEXT] == foo 
         
     def test_process_page(self):
         no_md_path = "/thing/there/hello/file/file_with_no_md"
@@ -371,6 +371,17 @@ class TestTypeParsing(unittest.TestCase):
         assert reg_result
         assert reg_result.type == DocBlockElementType.IMAGE
         
+        weird_image_token = {
+            "type": "image",
+            "children": [
+                {"type": "text", "raw": "An image to a relatively referenced image."}
+            ],
+            "attrs": {"url": "../../../resources/gecko_no_extension"}
+        }
+        weird_result = self.parser._on_image(weird_image_token)
+        assert weird_result
+        assert weird_result.type == DocBlockElementType.RESOURCE_REFERENCE
+        
     def test_link(self):
         test_link = {
             "type": "link",
@@ -439,6 +450,7 @@ class TestTypeParsing(unittest.TestCase):
             }
         }
         self.parser.set_export_mode("one_note")
+        
         result = self.parser._on_link(test_on_link)
         assert result
         assert len(result) == 3
@@ -453,6 +465,7 @@ class TestTypeParsing(unittest.TestCase):
                 assert item.status == "Unverified"
                 found_relative_references += 1
         assert found_relative_references == 2
+        
         self.parser.set_export_mode("generic")
         
             
@@ -712,6 +725,12 @@ class TestTypeParsing(unittest.TestCase):
         assert result[0].block_attr["ordered"] == True
         assert result[0].block_attr["depth"] == 0
         
+    def test_make_table_element(self):
+        null_result = self.parser._make_table_element(None, DocBlockElementType.TABLE)
+        assert null_result
+        assert len(null_result) == 1
+        assert null_result[0].type == DocBlockElementType.TABLE
+        
     def test_table(self):
         test_table = {'type': 'table',
   'children': [{'type': 'table_head',
@@ -778,46 +797,172 @@ class TestTypeParsing(unittest.TestCase):
         valid_types = ["table", "table_cell", "table_row", "table_head", "table_body", "text"]
         for item in result:
             assert item.type in valid_types
-            
-    def _test_combine_text(self):
-        combine_text_testObj = [
-            {'type': 'text', 'raw': 'Here is a '},
-            {'type': 'text', 'raw': '**BOLD**'},
-            {'type': 'text', 'raw': '. Here is an '},
-            {'type': 'text', 'raw': '*Italic*'},
-            {'type': 'text', 'raw': ' and here is a '},
-            {'type': 'text', 'raw': '***BOLD and Italic***'},
-            {'type': 'linebreak'},
-            {'type': "text", 'raw': 'This is on a new line.'},
-            {'type': 'softbreak'},
-            {'type': "text", 'raw': 'This is on the same line.'},
-            {'type': 'linebreak'},
-            {'type': 'linebreak'},
-            {'type': 'linebreak'},
-            {'type': "text", 'raw': 'This is on a new line.'}
+    
+    def test_block_html(self):
+        block_html_token = {
+            'type': 'block_html',
+            'raw': '<colgroup>\n<col style="width: 21%" />\n<col style="width: 78%" />\n</colgroup>\n'
+        }
+        result = self.parser._block_html(block_html_token)
+        assert result 
+        assert result.type == DocBlockElementType.BLOCK_HTML
+        assert result.block_content
+        
+    def test_strip_inline_HTML(self):
+        test_list = [
+            {'type': 'text', 'raw': 'Here is a paragraph with a inline HTML element for a '},
+            {'type': 'inline_html', 'raw': '<sup>'},
+            {'type': 'text', 'raw': 'superscript!'},
+            {'type': 'inline_html', 'raw': '</sup>'},
+            {'type': 'text', 'raw': ' Wowza!'}
         ]
-        result = self.parser._combine_text(combine_text_testObj)
-        invalid_types = ["linebreak", "softbreak", "codespan"]
-        assert result
-        assert isinstance(result, list)
-        assert len(result) == 1
+        result = self.parser._strip_inline_HTML(test_list)
+        assert len(result) == 5
         for item in result:
-            assert isinstance(item, dict)
-            assert isinstance(item.get("raw"), str)
-            assert item["type"] not in invalid_types
-
-        input_2 = combine_text_testObj + [{"type": "paragraph", "raw": "hello"}]
-        result_2 = self.parser._combine_text(input_2)
-        assert result_2
-        assert len(result_2) == 2
-        
+            assert item["type"] != self.parser.TOKEN_TYPES["INLINE_HTML"]
             
-    
+    def test_get_children_block_elements(self):
+        null_result = self.parser._get_children_block_elements({"type": "text"})
+        assert null_result
+        assert not null_result[0]
+        assert not null_result[1]
+        assert not null_result[2]
         
+    def test_remove_elements_of_type(self):
+        test_token_list = [
+            {"type": "text", "raw": "Hello There"},
+            {"type": "paragraph", "children": [
+                {"type": None},
+                {"type": "text", "raw": "Dont remove me!"}
+            ]},
+            {"type": "block_quote", "children": [
+                {"type": "text", "raw": "Nested quotes"},
+                {"type": "block_quote", "children": [
+                    {"type": "text", "raw": "Nested quotes"},
+                    {"type": "block_quote", "children": [
+                        {"type": "text", "raw": "Nested quotes"},
+                        {"type": "block_quote", "children": [
+                            {"type": "text", "raw": "Nested quotes"},
+                            {"type": None},
+                            {"type": "blank_line"}
+                        ]}
+                    ]}
+                ]}
+            ]}
+        ]
+        
+        result = self.parser._remove_elements_of_type(test_token_list, self.parser.trim_tokens)
+        block_list = self.parser.make_blocks(result)
+        for block in block_list:
+            assert block.type != None
+            assert block.type != self.parser.TOKEN_TYPES["BLANK_LINE"]
+            
+    def test_token_list2str(self):
+        test_token_list = [
+            {"type": "text", "raw": "Hello There"},
+            {"type": "linebreak"},
+            {"type": "paragraph", "children": [
+                {"type": "text", "raw": "Dont remove me!"},
+                {"type": "softbreak"}
+            ]},
+            {"type": "block_quote", "children": [
+                {"type": "text", "raw": "Nested quotes"},
+                {"type": "linebreak"},
+                {"type": "block_quote", "children": [
+                    {"type": "text", "raw": "doubly nested quotes"},
+                    {"type": "linebreak"},
+                    {"type": "block_quote", "children": [
+                        {"type": "text", "raw": "triply nested quotes"},
+                        {"type": "softbreak"},
+                        {"type": "block_quote", "children": [
+                            {"type": "text", "raw": "Nested quotes"},
+                            {"type": "softbreak"}
+                        ]}
+                    ]}
+                ]}
+            ]}
+        ]
+        answer = "Hello There\nDont remove me! Nested quotes\ndoubly nested quotes\ntriply nested quotes Nested quotes "
+        result = self.parser._token_list2str(test_token_list)
+        assert result
+        assert isinstance(result, str)
+        assert result == answer
+        
+    def test_simplify_token_list(self):
+        test_tokens = [
+            {"type": "codespan", "raw": "some codespan content"}
+        ]
+        answer = "`some codespan content`"
+        result = self.parser._simplify_token_list(test_tokens)
+        assert len(result) == 1
+        assert result[0]["type"] == self.parser.TOKEN_TYPES["TEXT"]
+        assert result[0]["raw"] == answer
+        
+        test_tokens.extend([
+            {"type": "linebreak"},
+            {"type": "strong", "children": [
+                {"type": "text", "raw": "some strong text"}
+            ]}]
+        )
+        answer += "\n**some strong text**"
+        result = self.parser._simplify_token_list(test_tokens)
+        assert len(result) == 1
+        assert result[0]["type"] == self.parser.TOKEN_TYPES["TEXT"]
+        assert result[0]["raw"] == answer
+        
+        test_tokens.extend([
+            {"type": "softbreak"},
+            {"type": "strong", "children": [
+                {"type": "emphasis", "children": [
+                    {"type": "text", "raw": "strong emphasis"}
+                ]}
+            ]}
+        ])
+        answer += " ***strong emphasis***"
+        result = self.parser._simplify_token_list(test_tokens)
+        assert len(result) == 1
+        assert result[0]["type"] == self.parser.TOKEN_TYPES["TEXT"]
+        assert result[0]["raw"] == answer
+        
+        test_tokens.extend([
+            {"type": "linebreak"},
+            {"type": "inline_html", "raw": "<sup>"},
+            {"type": "text", "raw": "superscript text using html!"},
+            {"type": "inline_html", "raw": "</sup>"}
+        ])
+        answer += "\n<sup>superscript text using html!</sup>"
+        result = self.parser._simplify_token_list(test_tokens)
+        assert len(result) == 1
+        assert result[0]["type"] == self.parser.TOKEN_TYPES["TEXT"]
+        assert result[0]["raw"] == answer
 
-
-    
-
-
-
-
+        test_tokens.extend([
+            {"type": "thematic_break"},
+            {"type": "paragraph", "children": [
+                {"type": "text", "raw": "Hello!"},
+                {"type": "linebreak"}
+            ]}
+        ])
+        result = self.parser._simplify_token_list(test_tokens)
+        assert len(result) == 3
+        
+    def test_on_check_relative(self):
+        test_token = {
+            "type": "link",
+            "raw": "hello there!",
+            "attrs": {
+                "url": "../../../../../resources/hello.txt"
+            }
+        }
+        filename_result, extension_result = self.parser._on_check_relative(test_token)
+        assert filename_result == "hello"
+        assert extension_result == ".txt"
+        
+        test_token["attrs"]["url"] = "../resources/no_extension"
+        filename_result, null_extension_result = self.parser._on_check_relative(test_token)
+        assert filename_result == "no_extension"
+        assert not null_extension_result
+        
+        test_token["attrs"]["url"] = "http://google.com/"
+        self.assertRaises(NotRelativeURIWarning, self.parser._on_check_relative, test_token)
+        

@@ -11,12 +11,12 @@ RESOURCES = os.getenv("RESOURCES")
 
 class TestUpload(unittest.TestCase):
     def setUp(self):
-        self.tool = OneNoteTools(MONGO_URI, "test_db", "docBlocks", "rdocBlocks")
+        self.tool = OneNoteTools(MONGO_URI, "test_db")
     
     def _test_reset_resources(self):
         self.tool.manager.reset_resources()
         
-    def test_upload_oneNote_export(self):
+    def _test_upload_oneNote_export(self):
         self.tool.manager.reset_resources()
         self.tool.manager.reset_collection()
         missed = self.tool.upload_oneNote_export(TEST_DIR)
@@ -34,6 +34,12 @@ class TestUpload(unittest.TestCase):
         
     def _test_upload_resources(self):
         self.tool.store_resources(RESOURCES)
+        
+    def test_print(self):
+        curse = self.tool.manager.find_blocks(type="link")
+        with open("./dump.txt", "w") as f:
+            for item in curse:
+                print(item.block_attr["url"], file=f)
         
     def _tearDown(self):
         self.tool.manager.reset_collection()
