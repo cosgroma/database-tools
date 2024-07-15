@@ -1,9 +1,64 @@
 import unittest
+import os
+
+from pathlib import Path
 from pprint import pprint
 
-
 from databasetools.models.block_model import DocBlockElement, DocBlockElementType
-from databasetools.adapters.oneNote.md2docBlock import Md2DocBlock, NotMDFileError, InvalidTokenError, NotRelativeURIWarning
+from databasetools.adapters.oneNote.md2docBlock import Md2DocBlock, InvalidTokenError, NotRelativeURIWarning
+from databasetools.adapters.oneNote.oneNote import OneNoteTools, AlreadyAttachedToDir
+
+MONGO_URI = os.getenv("MONGO_URI")
+TEST_DIR = os.getenv("TEST_DIR")
+
+class TestOneNote(unittest.TestCase):
+    def setUp(self):
+        if not MONGO_URI:
+            raise AttributeError("MONGO_URI environment variable not set. Set it in .env")
+        elif not TEST_DIR:
+            raise AttributeError("TEST_DIR environment variable not set. Set it in .env")
+        
+        self.on = OneNoteTools(MONGO_URI, "test_dir", "test_blocks", "test_relations", "test_resources")
+        
+    def test_current_dir_path(self):
+        assert not self.on._current_dir_path
+        assert not self.on._current_dir_name
+        
+        self.on._current_dir_path = "this/is/a/dumb.path"
+        assert self.on._current_dir_name == "dumb.path"
+        assert self.on._current_dir_path == Path("this/is/a/dumb.path")
+        
+        with self.assertRaises(AlreadyAttachedToDir):
+            self.on._current_dir_path = "replacing/current/path/when/it/is/already/defined.txt"
+            
+        del self.on._current_dir_path
+        assert not self.on._current_dir_name
+        assert not self.on._current_dir_path
+        
+        with self.assertRaises(AttributeError):
+            self.on._current_dir_name = "this_should_not_set.poop"
+        
+    def test_upload_oneNote_export(self):
+        pass
+        
+    def test_upload_md_dir(self):
+        pass
+    
+    def test_upload_block_list(self):
+        pass
+    
+    def test_parse_page_from_file(self):
+        pass
+    
+    def test_store_resources(self):
+        pass
+    
+    def test_verify_resources(self):
+        pass
+    
+    def test_get_resources(self):
+        pass
+        
 
 TEST_MD = '''
 

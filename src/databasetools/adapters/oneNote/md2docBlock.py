@@ -739,10 +739,6 @@ class InvalidTokenError(Exception):
     def __init__(self, *args: object) -> None:
         super().__init__(*args)
         
-class NotMDFileError(Exception):
-    def __init__(self, *args: object) -> None:
-        super().__init__(*args)
-        
 class InvalidExportMode(Exception):
     def __init__(self, *args: object) -> None:
         super().__init__(*args)

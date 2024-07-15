@@ -7,7 +7,6 @@ from databasetools.managers.docs_manager import DocManager
 DB_NAME = "test_oneNote_upload"
 MONGO_URI = os.getenv("MONGO_URI")
 TEST_DIR = os.getenv("TEST_DIR")
-RESOURCES = os.getenv("RESOURCES")
 
 class TestUpload(unittest.TestCase):
     def setUp(self):
@@ -30,10 +29,7 @@ class TestUpload(unittest.TestCase):
         assert isinstance(data, bytes)
     
     def _test_upload_dir(self):
-        self.tool.upload_dir(TEST_DIR)
-        
-    def _test_upload_resources(self):
-        self.tool.store_resources(RESOURCES)
+        self.tool.upload_md_dir(TEST_DIR)
         
     def test_print(self):
         curse = self.tool.manager.find_blocks(type="link")
