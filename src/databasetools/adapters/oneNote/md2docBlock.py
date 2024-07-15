@@ -9,24 +9,8 @@ from builtins import Exception
 
 from databasetools.models.block_model import DocBlockElement, DocBlockElementType
 
-VALID_METADATA_VALUES = ["title", "id", "oneNoteId", "oneNotePath", "updated", "created"]
-
 class Md2DocBlock:
-    """Class for converting Markdown into DocBlockElements.
-
-    Raises:
-        AttributeError: _description_
-        AttributeError: _description_
-        Exception: _description_
-        KeyError: _description_
-        InvalidTokenError: _description_
-        InvalidTokenError: _description_
-        InvalidTokenError: _description_
-        AttributeError: _description_
-        NotRelativeURIWarning: _description_
-
-    Returns:
-        _type_: _description_
+    """A class for parsing markdown into DocBlockElements.
     """
     GENERIC_MODE = "generic"
     ONE_NOTE_MODE = "one_note"
@@ -64,7 +48,13 @@ class Md2DocBlock:
         "BLANK_LINE": "blank_line",
     }
     
-    def __init__(self, add_trim_tokens: Optional[List[str]] = None, mode_set: Optional[str] = GENERIC_MODE):
+    def __init__(self, ignore_token_type_list: Optional[List[str]] = None, mode_set: Optional[str] = GENERIC_MODE):
+        """Initializes an Md2DocBlock instance.
+
+        Args:
+            ignore_token_type_list (Optional[List[str]], optional): additional list of token types for the parser to ignore. Parser automatically ignores None types and "blank_line" types. Defaults to None.
+            mode_set (Optional[str], optional): Parsing mode. Can be "Generic", "oneNote", or "User_Defined". Defaults to GENERIC_MODE.
+        """
         self._default_func_list = {
                 # Atomic types, No Children
                 DocBlockElementType.TEXT: self._text,
@@ -94,17 +84,30 @@ class Md2DocBlock:
         self.func_list = self._default_func_list
         
         self._ignored_token_types = [self.TOKEN_TYPES["BLANK_LINE"]]
-        if add_trim_tokens:
-            self.add_ignored_types(add_trim_tokens)
+        if ignore_token_type_list:
+            self.add_ignored_types(ignore_token_type_list)
         
         self.mode = mode_set
         
     @property
-    def mode(self):
+    def mode(self) -> str:
+        """Getter for the mode of an instance of this parser.
+
+        Returns:
+            str: Mode of the parser.
+        """
         return self._mode
     
     @mode.setter
     def mode(self, mode_to_set: str):
+        """Sets the mode of the parser, modifying the function list to a specific behavior. 
+
+        Args:
+            mode_to_set (str): Can be either Md2DocBlock.GENERIC_MODE or Md2DocBlock.ONE_NOTE_MODE.
+
+        Raises:
+            AttributeError: Using mode presets to configure the parse function list. 
+        """
         if mode_to_set == self.GENERIC_MODE:
             self._mode = self.GENERIC_MODE
             self._func_list = self._default_func_list.copy()
@@ -117,16 +120,21 @@ class Md2DocBlock:
             raise AttributeError(f"Invalid mode: {mode_to_set}")
         
     @property
-    def func_list(self):
+    def func_list(self) -> Dict[str, Callable]:
         """Shallow copy of parser list.
 
         Returns:
-            Dict[TOKEN_TYPES, Callable]: A string-callable dictionary for each token type specified in Md2DocBlock.TOKEN_TYPES
+            Dict[str, Callable]: A string-callable dictionary for each token type specified in Md2DocBlock.TOKEN_TYPES
         """
         return self._func_list.copy()
     
     @func_list.setter
     def func_list(self, set_func_list: Dict[DocBlockElementType, Callable]):
+        """Sets the entire parsing function list.
+
+        Args:
+            set_func_list (Dict[DocBlockElementType, Callable]): Function list to set the parser's function list to.
+        """
         self._func_list = set_func_list.copy()
     
     def override_func_list(self, token_parser_type: DocBlockElementType, token_parser_callable: Callable):
@@ -137,7 +145,7 @@ class Md2DocBlock:
             token_parser_callable (Optional[Callable]): Callable to replace the parser for a token type of token_parser_type.
 
         Raises:
-            AttributeError: No parser type specified to override. 
+            AttributeError: No parser type specified to override while token_parser_callable is not None.  
         """
         if not token_parser_type and token_parser_callable:
             raise AttributeError(f"No token parser type given to override with {token_parser_callable}.")
@@ -146,11 +154,21 @@ class Md2DocBlock:
             self._mode = self.USER_DEFINED_MODE
     
     @property
-    def ignored_token_types(self):
+    def ignored_token_types(self) -> List[str]:
+        """Returns a list of token types that the parser will ignore.
+
+        Returns:
+            List[str]: List of token types represented as strings. 
+        """
         return self._ignored_token_types.copy()
     
     @ignored_token_types.setter
     def ignored_token_types(self, token_types: List[str]):
+        """Sets all ignored token types for the parser and automatically adds "blank_line" to the list. 
+
+        Args:
+            token_types (List[str]): A list of strings corresponding to token types the parser should ignore.
+        """
         if not token_types:
             self._ignored_token_types = [self.TOKEN_TYPES["BLANK_LINE"]]
         else:
@@ -158,12 +176,25 @@ class Md2DocBlock:
             if not self.TOKEN_TYPES["BLANK_LINE"] in token_types:
                 self._ignored_token_types.append(self.TOKEN_TYPES["BLANK_LINE"])
             
-    def add_ignored_types(self, token_types: List[str]):
-        for item in token_types:
-            if not item in self._ignored_token_types and item:
-                self._ignored_token_types.append(item)
+    def add_ignored_types(self, token_types: Union[List[str], str]):
+        """Adds additional token types to ignore to parser.
+
+        Args:
+            token_types (Union[List[str], str]): Additional token types to add. May be strings or a list of strings
+        """
+        if isinstance(token_types, str):
+            self._ignored_token_types.append(token_types)
+        elif isinstance(token_types, list):
+            for item in token_types:
+                if not item in self._ignored_token_types and item:
+                    self._ignored_token_types.append(item)
 
     def remove_ignored_types(self, token_types: Union[List[str], str]):
+        """Removes types to ignore from the parser's ignore list.
+
+        Args:
+            token_types (Union[List[str], str]): Types to remove. Can be strings or list of strings. 
+        """
         if isinstance(token_types, str):
             if token_types in self._ignored_token_types:
                 self._ignored_token_types.remove(token_types)
@@ -171,21 +202,6 @@ class Md2DocBlock:
             for item in token_types:
                 if item in self._ignored_token_types:
                     self._ignored_token_types.remove(item)
-
-    # def process_page(self, file_path: Union[Path, str]) -> List[DocBlockElement]:
-    #     file_path = Path(file_path)
-        
-    #     if file_path.suffix != ".md":
-    #         raise NotMDFileError(f"File: {file_path} does not have a .md extension.") 
-    #     elif not os.path.exists(file_path): 
-    #         raise FileNotFoundError(f"The provided path: {file_path} does not exists.")
-    #     elif not os.path.isfile(file_path):
-    #         raise IsADirectoryError(f"The provided path: {file_path} is a directory. Use process_dir instead.")
-        
-    #     with open(file_path, "r") as f:
-    #         metadata, md = frontmatter.parse(f.read())
-            
-    #     relative_path = os.path.relpath(file_path, self._home_dir_path)
         
     def md2docblock(self, md: str) -> Tuple[List[DocBlockElement], List[ObjectId]]:
         """Processes a string of Markdown and returns a list DocBlockElements along with a list of id's of the highest level DocBlockElements in the list.
@@ -206,45 +222,7 @@ class Md2DocBlock:
             id_list.append(new_block_parent_id)
             block_list.extend(new_blocks)
         return block_list, id_list
-        
-    # def _process_generic_page(self, block_list: List[DocBlockElement], metadata: Dict[str, Any]) -> List[DocBlockElement]: #move?
-    #     page_block = block_list[0]
-    #     page_block.block_attr["frontmatter"] = metadata
-    #     page_block.tags = [self.GENERIC_MODE]
-    #     return block_list
-        
-    # def _process_oneNote_page(self, block_list: List[DocBlockElement], metadata: Dict[str, Any]) -> List[DocBlockElement]: # move?
-    #     # OneNote export frontmatter has these fields
-    #     # "metadata": {
-    #     #     "title": "Platform Library",
-    #     #     "id": "27bd2f39d4cc4017b64bc9b26645e0d5",
-    #     #     "oneNoteId": "{DDD92369-7933-0FFD-3970-C986A571D816}{1}{E1838393364313073899420146992507433720312551}",
-    #     #     "oneNotePath": null,
-    #     #     "updated": "2021-01-25 18:16:06-08:00",
-    #     #     "created": "2021-01-25 18:15:19-08:00"
-    #     # }
-        
-    #     # oneNote_id_pattern = r"^{(.+)}{.}{(.+)}$"
-    #     # on_id = metadata.get("oneNoteId")
-    #     # match = re.match(oneNote_id_pattern, on_id)
-    #     # section_id, other_id = match.groups()
-    #     # page_id = str(uuid.UUID(hex=metadata.get("id"))).upper()
-        
-    #     page_block = block_list[0]
-    #     page_block.name = str(metadata.get("title"))
-    #     page_block.block_attr = {
-    #         "oneNote_page_id": metadata.get("id"),
-    #         "oneNoteId": metadata.get("oneNoteId"),
-    #         # "oneNote_page_id": page_id,
-    #         # "oneNote_section_id": section_id,
-    #         # "oneNote_id": other_id,
-    #         "oneNote_created_at": metadata.get("created"),
-    #         "oneNote_modified_at": metadata.get("updated"),
-    #         "oneNote_path": metadata.get("oneNotePath")
-    #     }
-    #     page_block.tags = [self.ONE_NOTE_MODE]
-    #     return block_list
-        
+
     def md_to_token(self, raw_md: str) -> List[Dict[str, Any]]:
         """Parses a raw Markdown string into python tokens.
 
@@ -315,11 +293,17 @@ class Md2DocBlock:
         )
 
     def _heading(self, token: Dict[str, Any]) -> DocBlockElement:
-        '''
-            type: "heading"
-            block_attr: Stores the heading level under "level" which is located at token->attrs->level
-            block_content: Stripped raw text
-        '''
+        """Generates a DocBlockElement for a token of type "heading".
+
+        Args:
+            token (Dict[str, Any]): Token of type "heading".
+
+        Raises:
+            InvalidTokenError: If input token is does not follow mistune token syntax.
+
+        Returns:
+            DocBlockElement: _description_
+        """
         raw_content = self._simplify_token_list(token["children"])
         
         if len(raw_content) > 1:
@@ -565,6 +549,14 @@ class Md2DocBlock:
         )
         
     def _strip_inline_HTML(self, token_list: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Strips inline HTML tokens in a list of tokens, replacing them with text tokens with the html tag as its raw content.
+
+        Args:
+            token_list (List[Dict[str, Any]]): Input list that may or may not contain inline html tokens. 
+
+        Returns:
+            List[Dict[str, Any]]: A list of tokens that have inline html tokens replaced with text tokens.
+        """
         new_token_list = []
         for token in token_list:
             if token["type"] == self.TOKEN_TYPES["INLINE_HTML"]:
@@ -578,6 +570,14 @@ class Md2DocBlock:
         return new_token_list
 
     def _get_children_block_elements(self, token: Dict[str, Any]) -> Tuple[List[DocBlockElement], str, List[ObjectId]]:
+        """Generates DocBlockElements for each child of the input token and returns the list of children blocks, the raw content of all the children, and a list of id's corresponding to the returned children blocks.
+
+        Args:
+            token (Dict[str, Any]): Token to make children for.
+
+        Returns:
+            Tuple[List[DocBlockElement], str, List[ObjectId]]: The first element is a list of the generated children DocBlockElements. The second element is a string of raw content after concatenating all raw fields of children tokens. The last element is a list of block id's of the generated children block list.
+        """
         if not token:
             return ([], "", [])
         
@@ -590,7 +590,16 @@ class Md2DocBlock:
         id_list = [block.id for block in block_list]
         return (block_list, raw_content, id_list)
     
-    def _remove_elements_of_type(self, token_list: List[Dict[str, Any]], remove_types: List[Any]) -> List[Dict[str, Any]]:
+    def _remove_elements_of_type(self, token_list: List[Dict[str, Any]], remove_types: List[str]) -> List[Dict[str, Any]]:
+        """Given a string of tokens, recursively removes all tokens in "remove_types" from the list and each token's child list. 
+
+        Args:
+            token_list (List[Dict[str, Any]]): Token list to scrape.
+            remove_types (List[str]): A list of types to remove.
+
+        Returns:
+            List[Dict[str, Any]]: A cleaned list of tokens. 
+        """
         cleaned_list: List[Dict[str, Any]] = []
         for token in token_list:
             if not token["type"]:
@@ -615,14 +624,14 @@ class Md2DocBlock:
         return cleaned_list
 
     def _token_list2str(self, token_list: List[dict]) -> str:
-        '''
-            Parses the content of embedded tokens in token_list from children dictionaries into one string. 
-            Concatenates soft breaks and line breaks to the content string. 
-            First searches for "raw" attribute in each dictionary representing a atomic element. 
-            Secondly searches the "children" attribute and concatenates the content found in each element there. 
-            Concatenates all content from children and raw to make a plaintext string representing the content found in 
-            the element including all it's descendants. 
-        '''
+        """Takes a token list and extracts the raw element in each token recursively and returns the concatenated content. 
+
+        Args:
+            token_list (List[dict]): Token list to get all the raw content for. 
+
+        Returns:
+            str: A string of all the raw content. 
+        """
         content = ""
         for item in token_list:
             if item["type"] == self.TOKEN_TYPES["SOFTBREAK"]:
@@ -635,11 +644,15 @@ class Md2DocBlock:
                 content += self._token_list2str(item["children"])
         return content
     
-    def _simplify_token_list(self, token_list: List[Dict[str, Any]]) -> List[Dict[str, Any]]: 
-        '''
-            Removes strong and emphasis tokens.
-            Concatenates consecutive text, linebreaks, and softbreak tokens. 
-        '''
+    def _simplify_token_list(self, token_list: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Removes strong and emphasis tokens from the input token list, replacing them with markdown notation text. Also concatenates consecutive text tokens into one text token.
+
+        Args:
+            token_list (List[Dict[str, Any]]): A list of tokens to simplify.
+
+        Returns:
+            List[Dict[str, Any]]: A list of tokens without strong or emphasis tags and with less text tokens.
+        """
         if not token_list:
             return None
         
@@ -679,9 +692,17 @@ class Md2DocBlock:
         return final_list
     
     def _extract_bold_emphasis_content(self, token_list: List[Dict[str, Any]]) -> str: 
-        '''
-            This is a helper function and should only be called by _simplify_token_list
-        '''
+        """Helper function for _simplify_token_list. Should not be accessed. Recursively finds strong or emphasis token types and replaces them to Markdown text as raw content in a text token.
+
+        Args:
+            token_list (List[Dict[str, Any]]): A list of tokens.
+
+        Raises:
+            InvalidTokenError: If list contains any other token types than in allowed_types
+
+        Returns:
+            str: A string of text corresponding to the raw text with strong and emphasis denoted with markdown notation.
+        """
         content = ""
         allowed_types = [self.TOKEN_TYPES["STRONG"], self.TOKEN_TYPES["EMPHASIS"], self.TOKEN_TYPES["TEXT"]]
         for token in token_list:
@@ -704,7 +725,19 @@ class Md2DocBlock:
 
         return content
     
-    def _on_check_relative(self, token: Dict[str, Any]):
+    def _on_check_relative(self, token: Dict[str, Any]) -> Tuple[str, str]:
+        """Checks a token for a uri, and if it is a relative reference to another item in a resource folder like in a oneNote export. 
+
+        Args:
+            token (Dict[str, Any]): Token to check for a relative reference.
+
+        Raises:
+            AttributeError: Raised if the token does not have a url attribute in "attrs".
+            NotRelativeURIWarning: Raised if the token does not contain a relative URI
+
+        Returns:
+            Tuple[str, str]: Returns the name of the resource along with the extension as two strings.
+        """
         raw_uri = token.get("attrs").get("url")
         
         if not raw_uri:
@@ -718,6 +751,14 @@ class Md2DocBlock:
             raise NotRelativeURIWarning(f"Provided token does not contain a relative URI for a oneNote Export: {token}")
     
     def deep_copy_token(self, token: Dict[str, Any]) -> Dict[str, Any]:
+        """Creates a deep copy of a token and its children.
+
+        Args:
+            token (Dict[str, Any]): Token to copy.
+
+        Returns:
+            Dict[str, Any]: Deep copy of token.
+        """
         new_token = token.copy()
         for attr in new_token:
             if isinstance(token[attr], list):
@@ -727,6 +768,14 @@ class Md2DocBlock:
         return new_token
         
     def deep_copy_token_list(self, token_list: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Creates a deep copy of a list of tokens.
+
+        Args:
+            token_list (List[Dict[str, Any]]): Token list to copy.
+
+        Returns:
+            List[Dict[str, Any]]: Deep copy of token list.
+        """
         new_list = token_list.copy()
         for item in new_list:
             if isinstance(item, list):
@@ -736,13 +785,19 @@ class Md2DocBlock:
         return new_list
 
 class InvalidTokenError(Exception):
+    """Raised if a token passed as an argument does not have the format a parsing function expected.
+    """
     def __init__(self, *args: object) -> None:
         super().__init__(*args)
         
 class InvalidExportMode(Exception):
+    """Raised if trying to assign a export mode unrecognized by Md2DocBlock
+    """
     def __init__(self, *args: object) -> None:
         super().__init__(*args)
         
 class NotRelativeURIWarning(Exception):
+    """Raised if a URI is not a relative reference.
+    """
     def __init__(self, *args: object) -> None:
         super().__init__(*args)
