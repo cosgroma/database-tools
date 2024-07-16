@@ -1,64 +1,19 @@
 import unittest
 import os
+import shutil
+import tempfile
+import mongomock
 
 from pathlib import Path
 from pprint import pprint
+from bson import ObjectId
 
 from databasetools.models.block_model import DocBlockElement, DocBlockElementType
 from databasetools.adapters.oneNote.md2docBlock import Md2DocBlock, InvalidTokenError, NotRelativeURIWarning
-from databasetools.adapters.oneNote.oneNote import OneNoteTools, AlreadyAttachedToDir
+from databasetools.adapters.oneNote.oneNote import OneNoteTools, AlreadyAttachedToDir, NotMDFileError
 
 MONGO_URI = os.getenv("MONGO_URI")
 TEST_DIR = os.getenv("TEST_DIR")
-
-class TestOneNote(unittest.TestCase):
-    def setUp(self):
-        if not MONGO_URI:
-            raise AttributeError("MONGO_URI environment variable not set. Set it in .env")
-        elif not TEST_DIR:
-            raise AttributeError("TEST_DIR environment variable not set. Set it in .env")
-        
-        self.on = OneNoteTools(MONGO_URI, "test_dir", "test_blocks", "test_relations", "test_resources")
-        
-    def test_current_dir_path(self):
-        assert not self.on._current_dir_path
-        assert not self.on._current_dir_name
-        
-        self.on._current_dir_path = "this/is/a/dumb.path"
-        assert self.on._current_dir_name == "dumb.path"
-        assert self.on._current_dir_path == Path("this/is/a/dumb.path")
-        
-        with self.assertRaises(AlreadyAttachedToDir):
-            self.on._current_dir_path = "replacing/current/path/when/it/is/already/defined.txt"
-            
-        del self.on._current_dir_path
-        assert not self.on._current_dir_name
-        assert not self.on._current_dir_path
-        
-        with self.assertRaises(AttributeError):
-            self.on._current_dir_name = "this_should_not_set.poop"
-        
-    def test_upload_oneNote_export(self):
-        pass
-        
-    def test_upload_md_dir(self):
-        pass
-    
-    def test_upload_block_list(self):
-        pass
-    
-    def test_parse_page_from_file(self):
-        pass
-    
-    def test_store_resources(self):
-        pass
-    
-    def test_verify_resources(self):
-        pass
-    
-    def test_get_resources(self):
-        pass
-        
 
 TEST_MD = '''
 
@@ -155,56 +110,115 @@ Here is a paragraph with a inline HTML element for a <sup>superscript!</sup> Wow
 <col style="width: 78%" />
 </colgroup>
 
+**This is a some text with <sup>inline HTML</sup> and a [LINK](http://google.com/).
+
 [1]: Hello
 
 '''
 
-TEST_REMOVE_BOLD_EMPHASIS = [
-    {
-        'type': 'text', 
-        'raw': 'Here is a '
-    },
-    {
-        'type': 'strong', 
-        'children': [
-                {
-                    'type': 'text', 
-                    'raw': 'BOLD'
-                }
-            ]
-    },
-    {
-        'type': 'text', 
-        'raw': '. Here is an '
-    },
-    {
-        'type': 'emphasis',
-        'children': [
-                {
-                    'type': 'text', 
-                    'raw': 'Italic'
-                }
-            ]
-    },
-    {
-        'type': 'text', 
-        'raw': ' and here is a '
-    },
-    {
-        'type': 'emphasis',
-        'children': [
-            {
-                'type': 'strong',
-                'children': [
-                    {
-                        'type': 'text',
-                        'raw': 'BOLD and Italic'
-                    }
-                ]
-            }
-        ]
-    }
-]
+class TestOneNote(unittest.TestCase):
+    def setUp(self):
+        # Check mongo
+        if not MONGO_URI:
+            raise AttributeError("MONGO_URI environment variable not set. Set it in .env")
+    
+        self.on_test_dir = Path(tempfile.mkdtemp())
+        
+        # Write test markdown file
+        raw_fm = '''---\ntitle: How to own a turtle\nid: e8a544a56247455f8db120e2bfc32258\noneNoteId: '{182A7B13-941F-00A2-210B-8A28D8622AAE}{1}{E1891305927741015750620105221977488905505901}'\noneNotePath: /right/over/here\nupdated: 2022-10-18T04:53:03.0000000-07:00\ncreated: 2022-04-04T12:20:40.0000000-07:00\n---'''
+        self.test_md_path = self.on_test_dir / "test_md.md"
+        with open(self.test_md_path, "w") as md_file:
+            md_file.write(raw_fm + TEST_MD)
+        
+        # Initialize tool to test
+        self.on = OneNoteTools(MONGO_URI, "test_db", "test_blocks", "test_relations", "test_resources")
+        
+    def test_current_dir_path(self):
+        assert not self.on._current_dir_path
+        assert not self.on._current_dir_name
+        
+        self.on._current_dir_path = "this/is/a/dumb.path"
+        assert self.on._current_dir_name == "dumb.path"
+        assert self.on._current_dir_path == Path("this/is/a/dumb.path")
+        
+        with self.assertRaises(AlreadyAttachedToDir):
+            self.on._current_dir_path = "replacing/current/path/when/it/is/already/defined.txt"
+            
+        del self.on._current_dir_path
+        assert not self.on._current_dir_name
+        assert not self.on._current_dir_path
+        
+        with self.assertRaises(AttributeError):
+            self.on._current_dir_name = "this_should_not_set.poop"
+        
+    def test_upload_oneNote_export(self):
+        pass
+        
+    def test_upload_md_dir(self):
+        if not TEST_DIR:
+            raise ValueError(f"No test directory provided. Set the test directory environment variable to point to a valid oneNote export.")
+    
+        missed = self.on.upload_oneNote_export(TEST_DIR)
+        print(missed)
+    
+    def test_upload_block_list(self):
+        self.on.manager.reset_collection()
+        docNum = 1000
+        block_list = [DocBlockElement(type=DocBlockElementType.PAGE, name=str(num)) for num in range(docNum)]
+        self.on.upload_block_list(block_list)
+        assert self.on.manager.blocks_collection.count_documents({}) == docNum
+        
+        self.on.manager.reset_collection()
+    
+    def test_parse_page_from_file(self):
+        a_directory = self.on_test_dir / "bogus_dir"
+        os.mkdir(a_directory)
+        with self.assertRaises(TypeError):
+            self.on.parse_page_from_file(a_directory)
+        
+        with self.assertRaises(FileExistsError):
+            self.on.parse_page_from_file(self.on_test_dir / "boooOOOOgus_file.md")
+           
+        no_md_path =  self.on_test_dir / "no_md_extension.txt"
+        with open(no_md_path, "w") as file:
+            file.write("glub glub glub")
+        with self.assertRaises(NotMDFileError):
+            self.on.parse_page_from_file(no_md_path)
+        
+        self.on._current_dir_path = self.on_test_dir
+        block_list = self.on.parse_page_from_file(self.test_md_path)
+        assert block_list
+        assert isinstance(block_list, list)
+        for block in block_list:
+            assert isinstance(block, DocBlockElement)
+        page_block = block_list[0]
+        assert page_block.name == "How to own a turtle"
+        assert page_block.type == DocBlockElementType.PAGE
+        attrs = page_block.block_attr
+        assert attrs
+        assert attrs["oneNote_page_id"]
+        assert attrs["oneNoteId"]
+        assert attrs["oneNote_created_at"]
+        assert attrs["oneNote_modified_at"]
+        assert attrs["oneNote_path"]
+        assert attrs["export_name"] == os.path.basename(self.on_test_dir)
+        assert attrs["export_relative_path"]
+        
+        del self.on._current_dir_path
+        block_list = self.on.parse_page_from_file(self.test_md_path)
+        assert block_list
+        assert block_list[0].block_attr["export_name"] == None
+        assert block_list[0].block_attr["export_relative_path"] == None
+    
+    def test_store_resources(self):
+        invalid_dir = "/bogus/directory/that/cant/possibly/exist"
+        with self.assertRaises(FileNotFoundError):
+            self.on.store_resources(invalid_dir)
+    
+    def tearDown(self):
+        if os.path.exists(self.on_test_dir):
+            shutil.rmtree(self.on_test_dir)
+        
 
 class TestMd2DocBlock(unittest.TestCase):
     def setUp(self):

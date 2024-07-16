@@ -71,6 +71,8 @@ class Md2DocBlock:
                 DocBlockElementType.BLOCK_QUOTE: self._block_quote, # Text, Emphasis, Strong, Link, Image, Codespan, Block Code, Linebreak, Softbreak, Paragraph
                 DocBlockElementType.LIST_ITEM: self._list_item,
                 DocBlockElementType.LIST: self._list,
+                # DocBlockElementType.STRONG: self._strong,
+                # DocBlockElementType.EMPHASIS: self._emphasis,
                 
                 DocBlockElementType.TABLE: self._table,
                 DocBlockElementType.TABLE_HEAD: self._table_head,
@@ -218,9 +220,12 @@ class Md2DocBlock:
         block_list = []
         for item in token_list:
             new_blocks = self.make_blocks([item])
-            new_block_parent_id = new_blocks[0].id
-            id_list.append(new_block_parent_id)
-            block_list.extend(new_blocks)
+            if new_blocks:
+                new_block_parent_id = new_blocks[0].id
+                id_list.append(new_block_parent_id)
+                block_list.extend(new_blocks)
+            else:
+                continue
         return block_list, id_list
 
     def md_to_token(self, raw_md: str) -> List[Dict[str, Any]]:
@@ -548,6 +553,12 @@ class Md2DocBlock:
             block_content=token["raw"]
         )
         
+    def _strong(self, token: Dict[str, Any]) -> List[DocBlockElement]:
+        return self._make_table_element(token, DocBlockElementType.STRONG)
+    
+    def _emphasis(self, token: Dict[str, Any]) -> List[DocBlockElement]:
+        return self._make_table_element(token, DocBlockElementType.EMPHASIS)
+        
     def _strip_inline_HTML(self, token_list: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Strips inline HTML tokens in a list of tokens, replacing them with text tokens with the html tag as its raw content.
 
@@ -660,11 +671,9 @@ class Md2DocBlock:
         
         for token in token_list:
             if token["type"] == self.TOKEN_TYPES["STRONG"] or token["type"] == self.TOKEN_TYPES["EMPHASIS"]: 
-                new_token = {
-                    "type": self.TOKEN_TYPES["TEXT"],
-                    "raw": self._extract_bold_emphasis_content([token])
-                }
-                new_token_list.append(new_token)
+                strong_or_emphasis_list = self._remove_bold_emphasis(token)
+                if not None:
+                    new_token_list.extend(strong_or_emphasis_list)
             else:
                 new_token_list.append(self.deep_copy_token(token))
                 
@@ -691,39 +700,27 @@ class Md2DocBlock:
             final_list.append({"type": self.TOKEN_TYPES["TEXT"], "raw": content})
         return final_list
     
-    def _extract_bold_emphasis_content(self, token_list: List[Dict[str, Any]]) -> str: 
-        """Helper function for _simplify_token_list. Should not be accessed. Recursively finds strong or emphasis token types and replaces them to Markdown text as raw content in a text token.
+    def _remove_bold_emphasis(self, token: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Replaces "strong" or "emphasis" tokens with text tokens containing Markdown notation like **this**
 
         Args:
-            token_list (List[Dict[str, Any]]): A list of tokens.
-
-        Raises:
-            InvalidTokenError: If list contains any other token types than in allowed_types
+            token (Dict[str, Any]): Strong or emphasis token to parse
 
         Returns:
-            str: A string of text corresponding to the raw text with strong and emphasis denoted with markdown notation.
+            List[Dict[str, Any]]: A list of tokens containing the Markdown asterisk and the children tokens. 
         """
-        content = ""
-        allowed_types = [self.TOKEN_TYPES["STRONG"], self.TOKEN_TYPES["EMPHASIS"], self.TOKEN_TYPES["TEXT"]]
-        for token in token_list:
-            if not token["type"] in allowed_types:
-                raise InvalidTokenError(f"Token: {token} cannot be simplified with {self._extract_bold_emphasis_content}")
-            
-            raw = token.get("raw")
-            child_list = token.get("children")
-                                
-            if raw:
-                content += raw
-
-            if child_list:
-                content += self._extract_bold_emphasis_content(child_list)
-        
-            if token["type"] == self.TOKEN_TYPES["STRONG"]:
-                content = f"**{content}**"
-            elif token["type"] == self.TOKEN_TYPES["EMPHASIS"]:
-                content = f"*{content}*"
-
-        return content
+        if token["type"] == self.TOKEN_TYPES["STRONG"]:
+            new_list = self._simplify_token_list(token["children"])
+            new_list.insert(0, {"type": self.TOKEN_TYPES["TEXT"], "raw": "**"})
+            new_list.append({"type": self.TOKEN_TYPES["TEXT"], "raw": "**"})
+            return new_list
+        elif token["type"] == self.TOKEN_TYPES["EMPHASIS"]:
+            new_list = self._simplify_token_list(token["children"])
+            new_list.insert(0, {"type": self.TOKEN_TYPES["TEXT"], "raw": "*"})
+            new_list.append({"type": self.TOKEN_TYPES["TEXT"], "raw": "*"})
+            return new_list
+        else:
+            raise InvalidTokenError(f"Input token was not strong nor emphasis type: {token}")
     
     def _on_check_relative(self, token: Dict[str, Any]) -> Tuple[str, str]:
         """Checks a token for a uri, and if it is a relative reference to another item in a resource folder like in a oneNote export. 

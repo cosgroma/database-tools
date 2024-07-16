@@ -21,7 +21,7 @@ class OneNoteTools:
                 additional_trim_tokens: List[str] = None
             ):
         self.manager = DocManager(db_uri, db_name, blocks_collection_name, relations_collection_name, gridfs_name)
-        self.parser = Md2DocBlock(add_trim_tokens=additional_trim_tokens, mode_set=Md2DocBlock.ONE_NOTE_MODE)
+        self.parser = Md2DocBlock(ignore_token_type_list=additional_trim_tokens, mode_set=Md2DocBlock.ONE_NOTE_MODE)
         self.__current_dir_name = None
         self.__current_dir_path = None
         
@@ -118,9 +118,6 @@ class OneNoteTools:
             metadata, md = frontmatter.parse(md_file.read())
             
         block_list, id_list = self.parser.md2docblock(md)
-        
-        if not block_list and not id_list:
-            return None
         
         relative_path = None
         

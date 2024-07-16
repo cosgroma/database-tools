@@ -1,8 +1,9 @@
 
-from pymongo import MongoClient
+import gridfs
+import pymongo
 from typing import Dict, Any, List
 from pathlib import Path
-import gridfs
+
 
 from ..controller.mongo_controller import MongoCollectionController
 from ..models.block_model import DocBlockElement, BlockRelationship
@@ -22,7 +23,7 @@ class DocManager:
         self.blocks_collection_name = blocks_collection_name
         self.relations_collection_name = relations_collection_name
         self.gridfs_name = gridfs_name
-        self.client = MongoClient(db_uri)
+        self.client = pymongo.MongoClient(db_uri)
         self.db = self.client[db_name]
         self.blocks_collection = self.db[blocks_collection_name]
         self.relations_collection = self.db[relations_collection_name]
