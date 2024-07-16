@@ -81,6 +81,3 @@ class DocManager:
     def find_blocks(self, **kwargs):
         return self.blocks_controller.read(dict(kwargs))
 
-
-
-    
