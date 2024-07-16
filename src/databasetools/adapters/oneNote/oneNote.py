@@ -81,7 +81,7 @@ class OneNoteTools:
         if not os.path.exists(dir_path):
             raise FileNotFoundError(f"The specified filepath: {dir_path} does not exist.")
         elif not os.path.isdir(dir_path):
-            raise FileNotFoundError(f"File path provided is not a directory: {dir_path}")
+            raise NotADirectoryError(f"File path provided is not a directory: {dir_path}")
         
         for item in os.listdir(dir_path):
             item_path = os.path.join(dir_path, item)

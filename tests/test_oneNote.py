@@ -158,8 +158,21 @@ class TestOneNote(unittest.TestCase):
         if not TEST_DIR:
             raise ValueError(f"No test directory provided. Set the test directory environment variable to point to a valid oneNote export.")
     
-        missed = self.on.upload_oneNote_export(TEST_DIR)
-        print(missed)
+        # missed = self.on.upload_oneNote_export(TEST_DIR)
+        
+        with self.assertRaises(FileNotFoundError):
+            self.on.upload_md_dir("made/up/path/hahaha/hahaha/hahahaha")
+        
+        
+        with self.assertRaises(NotADirectoryError):
+            self.on.upload_md_dir(self.test_md_path)
+        
+            
+            
+                
+        
+        
+        
     
     def test_upload_block_list(self):
         self.on.manager.reset_collection()
