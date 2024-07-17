@@ -348,6 +348,21 @@ class TestMd2DocBlock(unittest.TestCase):
     def setUp(self):
         self.parser = Md2DocBlock()
         
+    def test_parse_md2docblock(self):
+        block_list, id_list = Md2DocBlock.parse_md2docblock(TEST_MD, Md2DocBlock.ONE_NOTE_MODE)
+        assert block_list
+        assert id_list
+        for block in block_list:
+            assert block.type in DocBlockElementType
+            
+        block_list, id_list = Md2DocBlock.parse_md2docblock(TEST_MD, Md2DocBlock.GENERIC_MODE)
+        assert block_list
+        assert id_list
+        for block in block_list:
+            assert block.type in DocBlockElementType
+            
+        
+        
     def test_init(self):
         assert self.parser.func_list
         assert len(self.parser.func_list) == 18
@@ -1234,3 +1249,17 @@ class TestMd2DocBlock(unittest.TestCase):
         test_token["attrs"]["url"] = "http://google.com/"
         self.assertRaises(NotRelativeURIWarning, self.parser._on_check_relative, test_token)
         
+class TestFullUpload(unittest.TestCase):
+    def setUp(self):
+        if not MONGO_URI:
+            raise AttributeError("MONGO_URI environment variable not set. Set it in .env")
+        self.db_name = "Full_Export_Test_DB"
+        self.gridFS_name = "Full_Export_Test_DB_GridFS"
+        self.on = OneNoteTools(db_uri=MONGO_URI, db_name=self.db_name, gridfs_name=self.gridFS_name)
+        
+    def _test_full_export(self):
+        if not TEST_DIR:
+            raise AttributeError("TEST_DIR environment variable not set. Set it in .env to point to a onenote export.")
+        self.on._manager.reset_collection()
+        self.on._manager.reset_resources()
+        missed_files = self.on.upload_oneNote_export(TEST_DIR)

@@ -64,20 +64,6 @@ class DocManager:
             return block
         return self.upload_block(block)
     
-    def upload_document(self, file_path: Path):
-        '''
-        1. Blockify document into relations and block
-        2. Upload blocks and relations to respective collections
-        '''
-        
-        pass
-
-    def update_document(self, file_path: Path):
-        '''
-        1. Determine a query method for matching files to documents in mongo
-        '''
-        pass
-    
     def find_blocks(self, **kwargs):
         return self.blocks_controller.read(dict(kwargs))
 

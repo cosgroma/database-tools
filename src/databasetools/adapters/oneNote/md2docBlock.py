@@ -48,6 +48,21 @@ class Md2DocBlock:
         "BLANK_LINE": "blank_line",
     }
     
+    @classmethod
+    def parse_md2docblock(cls, md: str, mode: Optional[str] = GENERIC_MODE, ignored_tokens: Optional[List[str]] = None) -> Tuple[List[DocBlockElement], List[ObjectId]]:
+        """Class method for parsing Markdown strings into DocBlockElements
+
+        Args:
+            md (str): Markdown string.
+            mode (Optional[str], optional): Parsing mode as defined by Md2DocBlock constants. Defaults to GENERIC_MODE.
+            ignored_tokens (Optional[List[str]], optional): Token types to ignore. Defaults to None.
+
+        Returns:
+            Tuple[List[DocBlockElement], List[ObjectId]]: The first element of the tuple is a list of the parsed DocBlockElements. The second element is a list of objectId's that correspond to the highest level DocBlockElements. 
+        """
+        parser = Md2DocBlock(mode_set=mode, ignore_token_type_list=ignored_tokens)
+        return parser.md2docblock(md)
+    
     def __init__(self, ignore_token_type_list: Optional[List[str]] = None, mode_set: Optional[str] = GENERIC_MODE):
         """Initializes an Md2DocBlock instance.
 

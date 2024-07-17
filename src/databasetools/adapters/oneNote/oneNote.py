@@ -17,11 +17,9 @@ class OneNoteTools:
                 db_name: str,
                 blocks_collection_name: str = "blocks",
                 relations_collection_name: str = "relations",
-                gridfs_name: str = "resources",
-                additional_trim_tokens: List[str] = None
+                gridfs_name: str = "resources"
             ):
         self._manager = DocManager(db_uri, db_name, blocks_collection_name, relations_collection_name, gridfs_name)
-        self._parser = Md2DocBlock(ignore_token_type_list=additional_trim_tokens, mode_set=Md2DocBlock.ONE_NOTE_MODE)
         self.__current_dir_name = None
         self.__current_dir_path = None
         
@@ -157,7 +155,7 @@ class OneNoteTools:
         with open(file_path, "r") as md_file:
             metadata, md = frontmatter.parse(md_file.read())
             
-        block_list, id_list = self._parser.md2docblock(md)
+        block_list, id_list = Md2DocBlock.parse_md2docblock(md, mode=Md2DocBlock.ONE_NOTE_MODE)
         
         relative_path = None
         
