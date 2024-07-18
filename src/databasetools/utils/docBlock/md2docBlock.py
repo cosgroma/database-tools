@@ -60,7 +60,7 @@ class Md2DocBlock:
         Returns:
             Tuple[List[DocBlockElement], List[ObjectId]]: The first element of the tuple is a list of the parsed DocBlockElements. The second element is a list of objectId's that correspond to the highest level DocBlockElements. 
         """
-        parser = Md2DocBlock(mode_set=mode, ignore_token_type_list=ignored_tokens)
+        parser = cls(mode_set=mode, ignore_token_type_list=ignored_tokens)
         return parser.md2docblock(md)
     
     def __init__(self, ignore_token_type_list: Optional[List[str]] = None, mode_set: Optional[str] = GENERIC_MODE):
@@ -86,8 +86,6 @@ class Md2DocBlock:
                 DocBlockElementType.BLOCK_QUOTE: self._block_quote, # Text, Emphasis, Strong, Link, Image, Codespan, Block Code, Linebreak, Softbreak, Paragraph
                 DocBlockElementType.LIST_ITEM: self._list_item,
                 DocBlockElementType.LIST: self._list,
-                # DocBlockElementType.STRONG: self._strong,
-                # DocBlockElementType.EMPHASIS: self._emphasis,
                 
                 DocBlockElementType.TABLE: self._table,
                 DocBlockElementType.TABLE_HEAD: self._table_head,
@@ -567,12 +565,6 @@ class Md2DocBlock:
             type=DocBlockElementType.BLOCK_HTML,
             block_content=token["raw"]
         )
-        
-    def _strong(self, token: Dict[str, Any]) -> List[DocBlockElement]:
-        return self._make_table_element(token, DocBlockElementType.STRONG)
-    
-    def _emphasis(self, token: Dict[str, Any]) -> List[DocBlockElement]:
-        return self._make_table_element(token, DocBlockElementType.EMPHASIS)
         
     def _strip_inline_HTML(self, token_list: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Strips inline HTML tokens in a list of tokens, replacing them with text tokens with the html tag as its raw content.

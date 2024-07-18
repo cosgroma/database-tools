@@ -6,7 +6,7 @@ from typing import Union, List
 from builtins import Exception
 
 
-from .md2docBlock import Md2DocBlock
+from ...utils.docBlock.md2docBlock import Md2DocBlock
 from databasetools.managers.docs_manager import DocManager
 from databasetools.models.block_model import DocBlockElement, DocBlockElementType
 
