@@ -12,15 +12,23 @@ class DocBlockElementType(str, Enum):
     PAGE = "page"
     
     TEXT = "text"
-    HEADING = "heading"
-    BLOCK_CODE = "block_code"
-    CODESPAN = "codespan"
-    
-    PARAGRAPH = "paragraph"
-    BLOCK_TEXT = "block_text"
+    EMPHASIS = "emphasis"
+    STRONG = "strong"
     LINK = "link"
     IMAGE = "image"
+    CODESPAN = "codespan"
+    LINE_BREAK = "linebreak"
+    SOFT_BREAK = "softbreak"
+    BLANK_LINE = "blank_line"
+    INLINE_HTML = "inline_html"
+    PARAGRAPH = "paragraph"
+    HEADING = "heading"
+    THEMATIC_BREAK = "thematic_break"
+    BLOCK_TEXT = "block_text"
+    BLOCK_CODE = "block_code"
     BLOCK_QUOTE = "block_quote"
+    BLOCK_HTML = "block_html"
+    
     LIST_ITEM = "list_item"
     LIST = "list"
     
@@ -29,10 +37,6 @@ class DocBlockElementType(str, Enum):
     TABLE_BODY = "table_body"
     TABLE_ROW = "table_row"
     TABLE_CELL = "table_cell"
-    
-    THEMATIC_BREAK = "thematic_break"
-    
-    BLOCK_HTML = "block_html"
     
     RESOURCE_REFERENCE = "resource_reference"
 
