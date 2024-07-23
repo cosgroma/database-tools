@@ -1,21 +1,29 @@
 import mistune
-import os
 import re
 
+from pprint import pprint
+from textwrap import indent
 from mistune.renderers.markdown import MarkdownRenderer
 from mistune.core import BlockState
 from mistune.plugins.table import table
-from typing import List, Dict, Any, Optional, Tuple, Callable
+from typing import List, Dict, Any, Optional, Tuple, Callable, Union
 from bson import ObjectId
 from builtins import Exception
+from pathlib import Path
 
 import mistune.renderers
 import mistune.renderers.markdown
 
 from databasetools.models.block_model import DocBlockElement, DocBlockElementType
 
+DEBUG = False
+
+def debug_print(item):
+    if DEBUG:
+        pprint(item, sort_dicts=False)
+
 class DocBlock2Md:
-    def __init__(self, block_list: List[DocBlockElement]):
+    def __init__(self, block_list: List[DocBlockElement], resource_prefix: Union[Path, str] = None):
         self._default_func_list = {
                 DocBlockElementType.TEXT: self._text,
                 DocBlockElementType.EMPHASIS: self._emphasis,
@@ -42,23 +50,36 @@ class DocBlock2Md:
                 DocBlockElementType.TABLE_HEAD: self._table_head,
                 DocBlockElementType.TABLE_BODY: self._table_body,
                 DocBlockElementType.TABLE_ROW: self._table_row,
-                DocBlockElementType.TABLE_CELL: self._table_cell
+                DocBlockElementType.TABLE_CELL: self._table_cell,
+                
+                DocBlockElementType.RESOURCE_REFERENCE: self._resource_reference
             }
-        
+        self._resource_prefix = Path(resource_prefix) if resource_prefix else None
+        self._required_resources: List[str] = []
         self.func_list = self._default_func_list.copy()
         self.__block_cache: Dict[ObjectId, DocBlockElement] = {block.id: block for block in block_list}
     
     @classmethod
-    def parse_docblock2md(cls, block_list: List[DocBlockElement], id_list: List[ObjectId]) -> str:
-        parser = cls(block_list)
+    def parse_docblock2md(cls, block_list: List[DocBlockElement], id_list: List[ObjectId], renderer = None, resource_prefix: Union[Path, str]= None) -> Tuple[str, List[str]]:
+        parser = cls(block_list, resource_prefix)
         token_list = []
         for id in id_list:
             block = parser.get_block(id)
             token = parser.make_token(block)
             token_list.append(token)
+
+        debug_print(token_list)
+        
+        block_state = BlockState()
+        for token in token_list:
+            block_state.append_token(token)
             
-        #needs return 
-    
+        if not renderer:
+            renderer = MdRenderer()
+
+        md_render = mistune.Markdown(renderer=renderer, plugins=[table])
+        return (md_render.render_state(block_state), parser._required_resources.copy())
+
     def make_token(self, block: DocBlockElement) -> Dict[str, Any]:
         b_type = block.type
         
@@ -116,10 +137,8 @@ class DocBlock2Md:
             "url": b_attr.get("url"),
             "title": b_attr.get("title")
         }
-        label = b_attr.get("label")
         return {
             "type": DocBlockElementType.LINK.value,
-            "label": label,
             "children": child_list,
             "attrs": attr
         }
@@ -250,13 +269,27 @@ class DocBlock2Md:
             "attrs": attrs
         }
     
+    def _resource_reference(self, block: DocBlockElement) -> Dict[str, Any]:
+        attrs = block.block_attr
+        orig_type = attrs.get("type") if attrs else None
+        basename = attrs.get("basename") if attrs else None
+        if orig_type == DocBlockElementType.IMAGE.value:
+            token = self._image(block)
+        elif orig_type == DocBlockElementType.LINK.value:
+            token = self._link(block)
+        
+        new_token_attrs = token.get("attrs")
+        new_token_attrs["url"] = str(self._resource_prefix / basename) if self._resource_prefix else basename
+        self._required_resources.append(basename)
+        return token
+    
     def make_table_token(self, block: DocBlockElement, element: DocBlockElementType):
         child_list = self.make_children_token(block)
         return {
             "type": element.value,
             "children": child_list
         }
-        
+    
 class Md2DocBlock:
     GENERIC_MODE = "generic"
     ONE_NOTE_MODE = "one_note"
@@ -397,43 +430,11 @@ class Md2DocBlock:
         """
         bp = mistune.BlockParser(max_nested_level=10) # Instantiate a new block parser to a predefined max nesting level
         markdown = mistune.Markdown(renderer=None, block=bp, plugins=[table]) # renderer=None allows parsing to python tokens. Import other plugins as needed
-        token_list = markdown(raw_md) 
-        return token_list
-    
-    # def make_blocks(self, token_list: List[Dict[str, Any]]) -> List[DocBlockElement]:
-        """Generates DocBlockElements from Markdown python tokens while maintaining block hierarchy with children list relation in each parent DocBlockElement.
-
-        Args:
-            token_list (List[Dict[str, Any]]): An Markdown AST from md_to_token.
-
-        Raises:
-            Exception: Re-raises exceptions from generating DocBlockElements with a description of the token make_blocks tried to parse.
-            KeyError: When a Markdown token is passed in with an invalid type.
-
-        Returns:
-            List[DocBlockElement]: A list of DocBlockElements generated from token_list.
-        """
-        block_list = []
-        for item in token_list:
-            
-            if not item:
-                return None
+        token_list = markdown(raw_md)
         
-            type = item["type"]
-            if type in self._func_list:
-                try:
-                    new_block = self._func_list[type](item)
-                except Exception as e:
-                    raise Exception(f"Trying to add token: {item}") from e
-            else:   
-                raise KeyError(f"Invalid object type: {type} not in function list, in object: {item}")
-            
-            if isinstance(new_block, list):
-                block_list.extend(new_block)
-            else:
-                block_list.append(new_block)
-        block_list = [item for item in block_list if item is not None]
-        return block_list
+        debug_print(token_list)
+        
+        return token_list
     
     def get_block_list(self):
         return self.__block_list.copy()
@@ -494,17 +495,17 @@ class Md2DocBlock:
             children=id_list,
             block_attr={
                 "url": url,
-                "title": title,
-                "label": token.get("label")
+                "title": title
             },
         )
     
     def _on_link(self, token: Dict[str, Any]) -> DocBlockElement:
         try:
-            extension = self._on_check_relative(token)
+            basename = self._on_check_relative(token)
             link_block = self._link(token)
             link_block.type = DocBlockElementType.RESOURCE_REFERENCE
-            link_block.block_attr["extension"] = extension
+            link_block.block_attr["basename"] = basename
+            link_block.block_attr["type"] = token["type"]
             return link_block
         except NotRelativeURIWarning:
             return self._link(token)
@@ -673,7 +674,7 @@ class Md2DocBlock:
             NotRelativeURIWarning: Raised if the token does not contain a relative URI
 
         Returns:
-            Tuple[str, str]: Returns the name of the resource along with the extension as two strings.
+            str: basename of the file.
         """
         raw_uri = token.get("attrs").get("url")
         
@@ -686,6 +687,58 @@ class Md2DocBlock:
             return match.group(1)
         else:
             raise NotRelativeURIWarning(f"Provided token does not contain a relative URI for a oneNote Export: {token}")
+        
+class MdRenderer(MarkdownRenderer):
+    def table(self, token: Dict[str, Any], state: BlockState):
+        out = ""
+        for child in token["children"]:
+            out += self.render_token(child, state) + "\n"
+        return out
+    
+    def table_head(self, token: Dict[str, Any], state: BlockState):
+        header_1 = ""
+        header_2 = ""
+        
+        for child in token["children"]:
+            header_1 += "| " + self.render_token(child, state) + " "
+            attrs = child.get("attrs")
+            alignment = attrs.get("align") if attrs else None
+            
+            if alignment == "left":
+                header_2 += "| :--- "
+            elif alignment == "right":
+                header_2 += "| ---: "
+            elif alignment == "center":
+                header_2 += "| :---: "
+            elif not alignment:
+                header_2 += "| --- "
+                
+        header_2 += "|"
+        header_1 += "|"
+        return header_1 + "\n" + header_2
+    
+    def table_body(self, token: Dict[str, Any], state: BlockState):
+        out = ""
+        for child in token["children"]:
+            out += self.render_token(child, state) + "\n"
+        return out
+    
+    def table_row(self, token: Dict[str, Any], state: BlockState):
+        out = ""
+        for child in token["children"]:
+            out += "| " + self.render_token(child, state) + " "
+        out += "|"
+        return out
+    
+    def table_cell(self, token: Dict[str, Any], state: BlockState):
+        return self.render_children(token, state)
+    
+    def block_quote(self, token: Dict[str, Any], state: BlockState) -> str:
+        text = self.render_children(token, state)
+        if len(token["children"]) == 1 and token["children"][0]["type"] == "block_quote":
+            text = text.rstrip() 
+            
+        return indent(text, "> ", lambda _: True) + "\n\n"
         
 class NotRelativeURIWarning(Exception):
     """Raised if a URI is not a relative reference.

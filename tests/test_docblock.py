@@ -3,9 +3,11 @@ import unittest
 from pprint import pprint
 
 import unittest.test
+import mistune
 
 from databasetools.models.block_model import DocBlockElement, DocBlockElementType
-from databasetools.utils.docBlock.md2docBlock import Md2DocBlock, DocBlock2Md
+from databasetools.utils.docBlock.markdown import Md2DocBlock, DocBlock2Md
+
 
 TEST_MD = '''
 
@@ -45,7 +47,7 @@ I should be a separate paragraph.
 I should be in the same paragraph on a different line.
 
 | Here | Is | A | Table |
-| --- | --- | --- | --- |
+| ---: | :--- | :---: | --- |
 | A | B | C | D |
 | A | B | C | D |
 
@@ -68,7 +70,7 @@ Here is a [link with a ***bold*** in it](another_link_)
 Here is a break!
 This should be part of the quote.
 >> Nested Quote!
->>>>>>> Helloooooooooo  
+>>>>>> Helloooooooooo  
 >
 > `Here is a code block`
 >
@@ -113,10 +115,34 @@ Here is a relative ![LINK](../../resources/hello.jpg)
 class TestDocBlock2Md(unittest.TestCase):
     def test_docblock2md(self):
         block_list, id_list = Md2DocBlock.parse_md2docblock(TEST_MD)
-        result = DocBlock2Md.parse_docblock2md(block_list, id_list)
-        print(result)
         
+        convert_result, required_resources = DocBlock2Md.parse_docblock2md(block_list, id_list) # Testing This!
         
+        html_convert_result = mistune.html(convert_result)
+        assert html_convert_result
+        assert isinstance(html_convert_result, str)
+        
+        renderer = mistune.HTMLRenderer(escape=False)
+        html_result, _ = DocBlock2Md.parse_docblock2md(block_list, id_list, renderer)
+        html_answer = mistune.html(TEST_MD)
+        
+        assert isinstance(html_answer, str)
+        assert html_answer == html_result
+        assert not required_resources
+        
+        block_list, id_list = Md2DocBlock.parse_md2docblock(TEST_MD, Md2DocBlock.ONE_NOTE_MODE)
+        
+        convert_result, required_resources = DocBlock2Md.parse_docblock2md(block_list, id_list, resource_prefix="hello") # Testing This!
+        
+        html_convert_result = mistune.html(convert_result)
+        assert isinstance(html_convert_result, str)
+        assert required_resources
+        assert len(required_resources) == 1
+        assert "hello/hello.jpg" in html_convert_result
+        truncated_result = "\n".join(html_convert_result.split("\n")[0:-2])
+        html_answer = "\n".join(html_answer.split("\n")[0:-2])
+        assert html_answer == truncated_result
+
 class TestMd2DocBlock(unittest.TestCase):
     def test_md2docblock(self):
         block_list, id_list = Md2DocBlock.parse_md2docblock(TEST_MD, mode=Md2DocBlock.ONE_NOTE_MODE)
