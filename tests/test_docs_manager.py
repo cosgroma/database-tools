@@ -1,11 +1,16 @@
 import os
 import unittest
-import mongomock
-import json
-from unittest.mock import patch
 from pathlib import Path
+
+from gridfs import GridFS
+from pymongo import MongoClient
+from pymongo.collection import Collection
+from pymongo.database import Database
+
+from databasetools.controller.mongo_controller import MongoCollectionController
 from databasetools.managers.docs_manager import DocManager
-from databasetools.models.mof_model import Relation, Element, ElementType
+from databasetools.models.block_model import DocBlockElement
+from databasetools.models.block_model import DocBlockElementType
 
 MONGO_URI = os.getenv("MONGO_URI")
 TEST_DIR = os.getenv("TEST_DIR")
@@ -15,55 +20,63 @@ MONGO_TEST_COLLECTION = "test_collection"
 
 TEST_DIR = Path(TEST_DIR)
 
+
 class TestDocManager(unittest.TestCase):
-    @patch("pymongo.MongoClient", new=mongomock.MongoClient)
     def setUp(self):
         self.manager = DocManager(
-            db_uri=MONGO_URI,
-            db_name="docs_test_db"
+            mongo_uri=MONGO_URI, docblock_db_name="TEST_Database", gridFS_db_name="TEST_GridFS", docblock_col_name="TEST_Collection"
         )
-        self.test_relation = Relation(
-            source_id="1111",
-            destination_id="2222",
-            relation_type="one_to_many"
-        )
-        self.test_block1 = Element(
-            element_id="0000",
-            name="Element 1",
-            element_type=ElementType.GENERIC,
-            labels=["Element 1 Label 1", "Element 1 Label 2"]
-        )
-        self.test_block2 = Element(
-            element_id="0001",
-            name="Element 2",
-            element_type=ElementType.USER,
-            labels=["Element 2 Label 1", "Element 2 Label 2"]
-        )
-    
-    def test_init(self):
-        self.assertIsNotNone(self.manager)
+        self.manager.reset_collection()
+        self.manager.reset_resources()
 
-    def test_upload_relation(self):
-        self.assertTrue(self.manager.upload_relation(self.test_relation))
-        result = self.manager.relations_collection.find_one({"source_id": "1111"})
-        assert result
-        self.assertEqual(result["source_id"], "1111")
-        self.assertEqual(result["destination_id"], "2222")
-        self.assertEqual(result["relation_type"], "one_to_many")
+    def test_init(self):
+        assert isinstance(self.manager, DocManager)
+        assert self.manager.mongo_uri
+        assert self.manager.docblock_db_name
+        assert self.manager.gridFS_db_name
+        assert self.manager.docblock_col_name
+
+        assert isinstance(self.manager._mongo_client, MongoClient)
+        assert isinstance(self.manager._gridFS_db, Database)
+        assert isinstance(self.manager._docblock_db, Database)
+        assert isinstance(self.manager._gridFS_client, GridFS)
+        assert isinstance(self.manager._docblock_col, Collection)
+        assert isinstance(self.manager._docblock_col_controller, MongoCollectionController)
+
+        assert self.manager._complete
+        assert self.manager._connected
+
+    def test_setters(self):
+        man = self.manager
+        vital_vars = [man._mongo_uri, man._docblock_db_name, man._gridFS_db_name, man._docblock_col_name]
+        connection_vars = [
+            man._mongo_client,
+            man._gridFS_db,
+            man._docblock_db,
+            man._gridFS_db,
+            man._docblock_col,
+            man._docblock_col_controller,
+        ]
+
+        for var in vital_vars:
+            assert var is not None
+        for var in connection_vars:
+            assert var is not None
+
+        man.mongo_uri = None
+        assert not man._complete
+        assert not man._connected
 
     def test_upload_block(self):
-        self.assertTrue(self.manager.upload_block(self.test_block1))
-        result = self.manager.blocks_collection.find_one({"element_id": "0000"})
-        assert result 
-        self.assertEqual(result["name"], "Element 1")
-        self.assertEqual(result["element_type"], ElementType.GENERIC)
-        self.assertTrue(self.manager.upload_block(self.test_block2))
-        doc_count = self.manager.blocks_collection.count_documents({})
-        self.assertEqual(doc_count, 2)
-   
+        test_block = DocBlockElement(type=DocBlockElementType.IMAGE)
+        return_item = self.manager.upload_block(test_block)
+        assert isinstance(return_item, DocBlockElement)
+
+        found_block = self.manager.find_blocks(type=DocBlockElementType.IMAGE.value)
+        assert len(found_block) == 1
+        assert isinstance(found_block[0], DocBlockElement)
+
     def tearDown(self):
         # Clear the test database after each test
-        self.manager.relations_collection.drop()
-        self.manager.blocks_collection.drop()
-
-    
+        self.manager.reset_collection()
+        self.manager.reset_resources()
