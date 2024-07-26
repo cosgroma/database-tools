@@ -9,8 +9,8 @@ from pymongo.database import Database
 
 from databasetools.controller.mongo_controller import MongoCollectionController
 from databasetools.managers.docs_manager import DocManager
-from databasetools.models.block_model import DocBlockElement
-from databasetools.models.block_model import DocBlockElementType
+from databasetools.models.docblock import DocBlockElement
+from databasetools.models.docblock import DocBlockElementType
 
 MONGO_URI = os.getenv("MONGO_URI")
 TEST_DIR = os.getenv("TEST_DIR")

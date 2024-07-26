@@ -1,15 +1,13 @@
 import unittest
-
-from pprint import pprint
-
 import unittest.test
+
 import mistune
 
-from databasetools.models.block_model import DocBlockElement, DocBlockElementType
-from databasetools.utils.docBlock.markdown import Md2DocBlock, DocBlock2Md
+from databasetools.models.docblock import DocBlockElementType
+from databasetools.utils.docBlock.docBlock_utils import FromDocBlock
+from databasetools.utils.docBlock.docBlock_utils import ToDocBlock
 
-
-TEST_MD = '''
+TEST_MD = """
 
 # Heading 1
 
@@ -43,7 +41,7 @@ peanuts.make_peanutbutter()
 This is finally a normal paragraph.
 This should be part of the same paragraph.
 
-I should be a separate paragraph.  
+I should be a separate paragraph.
 I should be in the same paragraph on a different line.
 
 | Here | Is | A | Table |
@@ -61,16 +59,16 @@ I should be in the same paragraph on a different line.
 
 ---
 ---
-  
+
 Here is a [LINK](a_link)
 
 Here is a [link with a ***bold*** in it](another_link_)
 
-> Here is a quote. Its not that long.  
+> Here is a quote. Its not that long.
 Here is a break!
 This should be part of the quote.
 >> Nested Quote!
->>>>>> Helloooooooooo  
+>>>>>> Helloooooooooo
 >
 > `Here is a code block`
 >
@@ -110,30 +108,31 @@ Here is a relative ![LINK](../../resources/hello.jpg)
 
 [1]: Hello
 
-'''
+"""
+
 
 class TestDocBlock2Md(unittest.TestCase):
     def test_docblock2md(self):
-        block_list, id_list = Md2DocBlock.parse_md2docblock(TEST_MD)
-        
-        convert_result, required_resources = DocBlock2Md.parse_docblock2md(block_list, id_list) # Testing This!
-        
+        block_list, id_list = ToDocBlock.parse_md2docblock(TEST_MD)
+
+        convert_result, required_resources = FromDocBlock.render_docBlock(block_list, id_list)  # Testing This!
+
         html_convert_result = mistune.html(convert_result)
         assert html_convert_result
         assert isinstance(html_convert_result, str)
-        
+
         renderer = mistune.HTMLRenderer(escape=False)
-        html_result, _ = DocBlock2Md.parse_docblock2md(block_list, id_list, renderer)
+        html_result, _ = FromDocBlock.render_docBlock(block_list, id_list, renderer)
         html_answer = mistune.html(TEST_MD)
-        
+
         assert isinstance(html_answer, str)
         assert html_answer == html_result
         assert not required_resources
-        
-        block_list, id_list = Md2DocBlock.parse_md2docblock(TEST_MD, Md2DocBlock.ONE_NOTE_MODE)
-        
-        convert_result, required_resources = DocBlock2Md.parse_docblock2md(block_list, id_list, resource_prefix="hello") # Testing This!
-        
+
+        block_list, id_list = ToDocBlock.parse_md2docblock(TEST_MD, ToDocBlock.ONE_NOTE_MODE)
+
+        convert_result, required_resources = FromDocBlock.render_docBlock(block_list, id_list, resource_prefix="hello")  # Testing This!
+
         html_convert_result = mistune.html(convert_result)
         assert isinstance(html_convert_result, str)
         assert required_resources
@@ -143,14 +142,13 @@ class TestDocBlock2Md(unittest.TestCase):
         html_answer = "\n".join(html_answer.split("\n")[0:-2])
         assert html_answer == truncated_result
 
+
 class TestMd2DocBlock(unittest.TestCase):
     def test_md2docblock(self):
-        block_list, id_list = Md2DocBlock.parse_md2docblock(TEST_MD, mode=Md2DocBlock.ONE_NOTE_MODE)
+        block_list, id_list = ToDocBlock.parse_md2docblock(TEST_MD, mode=ToDocBlock.ONE_NOTE_MODE)
         assert block_list
         assert id_list
-        
+
         type_list = [block.type for block in block_list]
-        
+
         assert DocBlockElementType.RESOURCE_REFERENCE in type_list
-        
-        

@@ -8,7 +8,7 @@ from pymongo.collection import Collection
 from pymongo.database import Database
 
 from ..controller.mongo_controller import MongoCollectionController
-from ..models.block_model import DocBlockElement
+from ..models.docblock import DocBlockElement
 
 DEFAULT_MANAGER = "default_manager"
 ONE_NOTE_MANAGER = "one_note_manager"

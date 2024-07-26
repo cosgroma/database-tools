@@ -5,12 +5,11 @@ from typing import List
 from typing import Union
 
 import frontmatter
-from bson import ObjectId
 
 from databasetools.managers.docs_manager import DocManager
-from databasetools.models.block_model import DocBlockElement
-from databasetools.models.block_model import DocBlockElementType
-from databasetools.utils.docBlock.markdown import Md2DocBlock
+from databasetools.models.docblock import DocBlockElement
+from databasetools.models.docblock import DocBlockElementType
+from databasetools.utils.docBlock.docBlock_utils import ToDocBlock
 
 
 class OneNoteTools:
@@ -154,7 +153,7 @@ class OneNoteTools:
         with file_path.open("r") as md_file:
             metadata, md = frontmatter.parse(md_file.read())
 
-        block_list, id_list = Md2DocBlock.parse_md2docblock(md, mode=Md2DocBlock.ONE_NOTE_MODE)
+        block_list, id_list = ToDocBlock.parse_md2docblock(md, mode=ToDocBlock.ONE_NOTE_MODE)
 
         relative_path = None
 
@@ -175,13 +174,6 @@ class OneNoteTools:
 
         block_list.insert(0, new_block)
         return block_list
-
-    def reconstruct_page(self, page_id: Union[ObjectId, Path, str]):
-        """
-        First resolve page_id as an objectid, a pathname, or a string representing the name of the file.
-        second, extract all relevant DocBlocks (page children).
-        third, use docblock2md to convert back to md or other format.
-        """
 
     def store_resources(self, dir_path: Union[Path, str]):
         """Given a directory, uploads the contents into a GridFS instance on the MongoDB attached to this class.

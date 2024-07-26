@@ -1,3 +1,4 @@
+atlassian-python-api
 click
 docopt
 fuzzywuzzy
@@ -15,4 +16,5 @@ python-frontmatter
 pytz
 pytest
 unicode
+requests-ratelimiter
 mistune

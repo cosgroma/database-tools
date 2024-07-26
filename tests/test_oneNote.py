@@ -11,8 +11,8 @@ from databasetools.adapters.oneNote.oneNote import AlreadyAttachedToDir
 from databasetools.adapters.oneNote.oneNote import NotMDFileError
 from databasetools.adapters.oneNote.oneNote import NotOneNoteExport
 from databasetools.adapters.oneNote.oneNote import OneNoteTools
-from databasetools.models.block_model import DocBlockElement
-from databasetools.models.block_model import DocBlockElementType
+from databasetools.models.docblock import DocBlockElement
+from databasetools.models.docblock import DocBlockElementType
 
 MONGO_URI = os.getenv("MONGO_URI")
 TEST_DIR = os.getenv("TEST_DIR")
@@ -357,7 +357,7 @@ class TestFullUpload(unittest.TestCase):
         self.gridFS_name = "Full_Export_Test_DB_GridFS"
         self.on = OneNoteTools(db_uri=MONGO_URI, db_name=self.db_name, gridfs_name=self.gridFS_name)
 
-    def _test_full_export(self):
+    def test_full_export(self):
         if not TEST_DIR:
             raise AttributeError("TEST_DIR environment variable not set. Set it in .env to point to a onenote export.")
         self.on._manager.reset_collection()
