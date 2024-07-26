@@ -1,9 +1,10 @@
+atlassian-python-api
 click
 docopt
 fuzzywuzzy
 levenshtein
 markdown
-mongomock @ git+https://github.com/mongomock/mongomock@develop
+mongomock @ git+https://github.com/mongomock/mongomock
 notion-client>=0.8.0
 notion-database==1.2.0
 notion-objects==0.6.2
@@ -13,5 +14,7 @@ python-dateutil==2.9.0.post0
 python-dotenv==1.0.1
 python-frontmatter
 pytz
+pytest
 unicode
+requests-ratelimiter
 mistune
