@@ -135,7 +135,7 @@ class FromDocBlock:
             resource_prefix (Union[Path, str], optional): Prefix used before the basename of relative resource references in the URL field. Defaults to None.
 
         Returns:
-            Tuple[str, List[str]]: _description_
+            Tuple[str, List[str]]: Output Markdown string, list of resources needed to render page.
         """
         if renderer is None:
             renderer = MdRenderer()

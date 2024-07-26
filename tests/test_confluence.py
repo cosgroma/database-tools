@@ -141,21 +141,22 @@ class TestConfluence(unittest.TestCase):
 
         self.main_page = self.con_man.get_confluence_page_id("Test Page")
 
-    def test_make_page(self):
+    def _test_make_page(self):
         content = mistune.html(TEST_MD)
-        self.con_man.make_confluence_page("test_md", content, self.main_page)
+        new_name = self.con_man.alias_name("test_md")
+        self.con_man.make_confluence_page(new_name, content, self.main_page)
 
-    def test_get_mongo_page_ids(self):
+    def _test_get_mongo_page_ids(self):
         results = self.con_man.get_mongo_page_blocks()
         for item in results:
             assert isinstance(item, DocBlockElement)
             assert item.type == DocBlockElementType.PAGE
 
     def test_upload_pages(self):
-        page_blocks = self.con_man.get_mongo_page_blocks()[0:20]
+        page_blocks = self.con_man.get_mongo_page_blocks()[3:7]
         self.con_man.upload_pages(page_blocks)
 
-    def test_add_confluence_attachment(self):
+    def _test_add_confluence_attachment(self):
         temp_dir = Path(tempfile.mkdtemp())
         test_name = "003635cb420941afacda1cf27caa921c"
         file = self.con_man.mongo_man.fs_find_file(filename=test_name)

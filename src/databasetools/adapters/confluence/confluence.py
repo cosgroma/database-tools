@@ -8,8 +8,10 @@ from typing import Union
 import mistune
 from atlassian.confluence import Confluence
 from bson import ObjectId
+from mistune.plugins.table import table
 from requests_ratelimiter import LimiterSession
 
+from databasetools.adapters.confluence.cf_adapter import image2cf
 from databasetools.managers.docs_manager import DocManager
 from databasetools.models.docblock import DocBlockElement
 from databasetools.models.docblock import DocBlockElementType
@@ -34,7 +36,7 @@ class ConfluenceManager:
             docblock_col_name=mongo_docblock_collection_name,
             gridFS_db_name=mongo_gridFS_db_name,
         )
-        session = LimiterSession(per_second=0.8)
+        session = LimiterSession(per_second=0.5)
         self.confluence_client = Confluence(
             url=confluence_url, username=confluence_username, password=confluence_api_token, session=session
         )
@@ -47,13 +49,16 @@ class ConfluenceManager:
         for page_block in page_blocks:
             children_ids = page_block.children
             block_list = self.get_children_block_tree_list(page_block)
-            content, required_resources = FromDocBlock.render_docBlock(block_list, children_ids, resource_prefix="RESOURCE")
 
-            html_content = mistune.html(content)
+            content, required_resources = FromDocBlock.render_docBlock(block_list, children_ids, resource_prefix="RESOURCE")
+            conv = mistune.Markdown(renderer=mistune.HTMLRenderer(escape=False), plugins=[table])
+            conv.block.list_rules += ["table"]
+            html_content = image2cf(conv.parse(content)[0])
+
             page_name = self.alias_name(page_block.name)
             self.make_confluence_page(
                 page_name, html_content, self.get_confluence_page_id("Test Page")
-            )  # -----------------------------------------------------------------------
+            )  # ---------------------------------------------------------------------------------------------------------------------- REMOVE "Test Page"
             page_id = self.get_confluence_page_id(page_name)
             self.download_and_upload_resource(required_resources, page_id)
 
@@ -100,9 +105,11 @@ class ConfluenceManager:
 
     def alias_name(self, title: str):
         numba = 1
-        while self.title_exists(title):
-            title = title + "_" + str(numba)
-        return title
+        new_title = title
+        while self.title_exists(new_title):
+            new_title = title + "_" + str(numba)
+            numba += 1
+        return new_title
 
     def title_exists(self, title: str):
         result = self.get_confluence_page_id(title)
