@@ -1,176 +1,132 @@
-from typing import ClassVar
+from typing import Dict
 from typing import List
 from typing import Optional
+from typing import Tuple
+from typing import Union
 
 from gridfs import GridFS
 from pymongo import MongoClient
 from pymongo.collection import Collection
 from pymongo.database import Database
 
+from databasetools.controller.base_controller import T
+
 from ..controller.mongo_controller import MongoCollectionController
 from ..models.docblock import DocBlockElement
 
-DEFAULT_MANAGER = "default_manager"
-ONE_NOTE_MANAGER = "one_note_manager"
+DATABASE = 0
+GRID_CLIENT = 1
+COLLECTION = 0
+COL_CON = 1
 
 
 class DocManager:
-    _instances: ClassVar = {}
+    # Default, always initiated, gridFS name
+    RESOURCES = "resources"
+    # Default, always initiated, collection name
+    DOC_BLOCKS = "doc_blocks"
 
     def __init__(
         self,
         mongo_uri: Optional[str] = None,
-        docblock_db_name: Optional[str] = None,
-        gridFS_db_name: Optional[str] = None,
-        docblock_col_name: Optional[str] = None,
-    ):
+        doc_block_db_name: Optional[str] = None,
+        gridFS_db_names: Optional[Union[List[str], str]] = None,
+        docblock_col_infos: Optional[Union[List[Tuple[str, T]], Tuple[str, T]]] = None,
+    ) -> None:
+        gridFS_db_names = (
+            [gridFS_db_names] if isinstance(gridFS_db_names, str) else gridFS_db_names
+        )  # Allows users to input just one string or a list of strings
+        docblock_col_infos = [docblock_col_infos] if isinstance(docblock_col_infos, Tuple) else docblock_col_infos
+
+        if gridFS_db_names is None:
+            gridFS_db_names = [DocManager.RESOURCES]
+        elif DocManager.RESOURCES not in gridFS_db_names:
+            gridFS_db_names.append(DocManager.RESOURCES)
+
+        if docblock_col_infos is None:
+            docblock_col_infos = [(DocManager.DOC_BLOCKS, DocBlockElement)]
+        elif (DocManager.DOC_BLOCKS, DocBlockElement) not in docblock_col_infos:
+            docblock_col_infos.append((DocManager.DOC_BLOCKS, DocBlockElement))
 
         self._mongo_uri: str = mongo_uri
-        self._docblock_db_name: str = docblock_db_name
-        self._gridFS_db_name: str = gridFS_db_name
-        self._docblock_col_name: str = docblock_col_name
+        self._grid_names: List[str] = gridFS_db_names
+        self._col_infos: List[Tuple[str, T]] = docblock_col_infos
+        self._db_db_name = "DocBlocks" if doc_block_db_name is None else doc_block_db_name  # "Doc Block DataBase name" ;)
 
-        self._mongo_client: MongoClient = None
-        self._gridFS_db: Database = None
-        self._docblock_db: Database = None
-        self._gridFS_client: GridFS = None
-        self._docblock_col: Collection = None
-        self._docblock_col_controller: MongoCollectionController = None
+        self._mongo_client: MongoClient = MongoClient(self._mongo_uri)
+        self._docblock_db: Database = self._mongo_client[self._db_db_name]
+        self._grids: Dict[str, Tuple[Database, GridFS]] = self.make_grids(self._grid_names)
+        self._collections: Dict[str, Tuple[Collection, MongoCollectionController]] = self.make_collections(self._col_infos)
 
-        self.connect_all()
+    def get_collection(self, name: str) -> Tuple[Collection, MongoCollectionController]:
+        return self._collections[name]
 
-    @staticmethod
-    def get_instance(
-        instance_name: str = DEFAULT_MANAGER,
-        mongo_uri: Optional[str] = None,
-        docblock_db_name: Optional[str] = None,
-        gridFS_db_name: Optional[str] = None,
-        docblock_col_name: Optional[str] = None,
-    ):
-        if not DocManager._instances.get(instance_name):
-            DocManager._instances[instance_name] = DocManager(mongo_uri, docblock_db_name, gridFS_db_name, docblock_col_name)
-        return DocManager._instances[instance_name]
+    def get_grid(self, name: str) -> Tuple[Database, GridFS]:
+        return self._grids[name]
 
-    def connect_all(self):
-        self._complete = (
-            self._mongo_uri is not None
-            and self._docblock_db_name is not None
-            and self._gridFS_db_name is not None
-            and self._docblock_col_name is not None
-        )
-        if self._complete:
-            self._mongo_client = MongoClient(self._mongo_uri)
-            self._gridFS_db = self._mongo_client[self._gridFS_db_name]
-            self._docblock_db = self._mongo_client[self._docblock_db_name]
-            self._gridFS_client = GridFS(self._gridFS_db)
-            self._docblock_col = self._docblock_db[self._docblock_col_name]
-            self._docblock_col_controller = MongoCollectionController(self._docblock_col, DocBlockElement)
-        self._connected = (
-            self._mongo_client is not None
-            and self._gridFS_db is not None
-            and self._docblock_db is not None
-            and self._gridFS_client is not None
-            and self._docblock_col is not None
-            and self._docblock_col_controller is not None
-        )
+    def make_grids(self, names: Union[str, List[str]]) -> Dict[str, Tuple[Database, GridFS]]:
+        names = [names] if isinstance(names, str) else names
+        new_grids = {}
+        for name in names:
+            db_instance = self._mongo_client[name]
+            grid_client = GridFS(db_instance)
+            new_grids[name] = (db_instance, grid_client)
+        return new_grids
 
-    def close_all(self):
-        self._gridFS_db = None
-        self._docblock_db = None
-        self._gridFS_client = None
-        self._docblock_col = None
-        self._docblock_col_controller = None
-        self._mongo_client.close()
-        self._mongo_client = None
-        self._connected = False
+    def make_collections(self, names: Union[Tuple[str, T], List[Tuple[str, T]]]) -> Dict[str, Tuple[Collection, MongoCollectionController]]:
+        names = [names] if isinstance(names, Tuple) else names
+        new_cols = {}
+        for name, block_type in names:
+            collection_instance = self._docblock_db[name]
+            collection_controller = MongoCollectionController(collection_instance, block_type)
+            new_cols[name] = (collection_instance, collection_controller)
+        return new_cols
 
-    @property
-    def mongo_uri(self):
-        return self._mongo_uri
+    def reset_collections(self, names: Optional[Union[str, List[str]]] = None) -> None:
+        """Resets collections specified by "names" by deleting all documents in those collections. If no name is specified, this method will delete all documents in all collections in the doc_block database.
 
-    @property
-    def docblock_db_name(self):
-        return self._docblock_db_name
+        Args:
+            names (Optional[Union[str, List[str]]], optional): Names of the collections to reset. If None, this method will delete ALL documents in ALL collections under the doc_block database. Defaults to None.
+        """
+        names = [names] if isinstance(names, str) else names
+        if names is None:
+            names = [name for name, _ in self._col_infos]
 
-    @property
-    def gridFS_db_name(self):
-        return self._gridFS_db_name
+        for name in names:
+            self._collections[name][COL_CON].delete_all()
 
-    @property
-    def docblock_col_name(self):
-        return self._docblock_col_name
+    def reset_grids(self, names: Optional[Union[str, List[str]]] = None) -> None:
+        """Resets grid instances by dropping the associated database and re-instantiating each instance. If no gridDB name is given, ALL gridDB instances will be reset.
 
-    @mongo_uri.setter
-    def mongo_uri(self, new_mongo_uri: str):
-        if new_mongo_uri != self._mongo_uri:
-            self.close_all()
-            self._mongo_uri = new_mongo_uri
-            self.connect_all()
+        Args:
+            names (Optional[Union[str, List[str]]], optional): Names of the gridDB's to reset. If None, this method will reset ALL gridDBs. Defaults to None.
+        """
+        names = [names] if isinstance(names, str) else names
+        if names is None:
+            names = self._grid_names
 
-    @docblock_db_name.setter
-    def docblock_db_name(self, new_db_name: str):
-        if new_db_name != self.docblock_db_name:
-            self.close_all()
-            self.docblock_db_name = new_db_name
-            self.connect_all()
+        for name in names:
+            self._mongo_client.drop_database(name)
+            self._grids[name] = self.make_grids(name)[name]
 
-    @gridFS_db_name.setter
-    def gridFS_db_name(self, new_db_name: str):
-        if new_db_name != self.gridFS_db_name:
-            self.close_all()
-            self.gridFS_db_name = new_db_name
-            self.connect_all()
-
-    @docblock_col_name.setter
-    def docblock_col_name(self, new_col_name: str):
-        if new_col_name != self.docblock_col_name:
-            self.close_all()
-            self.docblock_col_name = new_col_name
-            self.connect_all()
-
-    def check_connection(func):
-        def with_check(self, *args):
-            if not self._connected:
-                return False
-            else:
-                return func(self, *args)
-
-        return with_check
-
-    def fs_store_file(self, data: bytes, **kwargs):
-        return self._gridFS_client.put(data, **kwargs)
-
-    def fs_find_file(self, **kwargs):
-        return self._gridFS_client.find_one(dict(kwargs))
-
-    @check_connection
-    def reset_resources(self):
-        self._mongo_client.drop_database(self._gridFS_db_name)
-        self.gridFS_db_name = self.gridFS_db_name
-
-    @check_connection
-    def reset_collection(self):  # Danger zone! For testing only!
-        self._docblock_col_controller.delete_all()
-
-    def upload_block(self, block: DocBlockElement):
+    def upload_to_col(self, collection_name: str, block: T):
+        controller = self._collections[collection_name][COL_CON]
         try:
-            return self._docblock_col_controller.create(block)
+            return controller.create(block)
         except Exception as e:
-            raise Exception(f"Trying to add block: {block}") from e
+            raise Exception(f"Whilst uploading block: {block} to {collection_name}") from e
 
-    def update_block(self, block: DocBlockElement):
-        return self._docblock_col_controller.update({"element_id": block.id}, block)
+    def find_in_col(self, collection_name: str, **kwargs) -> List[DocBlockElement]:
+        controller = self._collections[collection_name][COL_CON]
+        return controller.read(dict(kwargs))
 
-    def sync_block(self, block: DocBlockElement):
-        update_result = self.update_block(block)
-        if update_result:
-            return block
-        return self.upload_block(block)
+    def upload_to_grid(self, grid_name: str, data: bytes, **kwargs):
+        grid_dude = self._grids[grid_name][GRID_CLIENT]
+        try:
+            return grid_dude.put(data, **kwargs)
+        except Exception as e:
+            raise Exception(f"While attempting to upload data to grid instance: {grid_name}, with arguments: {kwargs}") from e
 
-    def find_blocks(self, **kwargs) -> List[DocBlockElement]:
-        return self._docblock_col_controller.read(dict(kwargs))
-
-
-class IncompleteClassError(Exception):
-    def __init__(self, *args: object) -> None:
-        super().__init__(*args)
+    def find_in_grid(self, grid_name: str, **kwargs):
+        grid_dude = self._grids[grid_name][GRID_CLIENT]
+        return grid_dude.find_one(dict(kwargs))

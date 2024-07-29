@@ -11,6 +11,7 @@ from databasetools.adapters.oneNote.oneNote import AlreadyAttachedToDir
 from databasetools.adapters.oneNote.oneNote import NotMDFileError
 from databasetools.adapters.oneNote.oneNote import NotOneNoteExport
 from databasetools.adapters.oneNote.oneNote import OneNoteTools
+from databasetools.managers.docs_manager import DocManager
 from databasetools.models.docblock import DocBlockElement
 from databasetools.models.docblock import DocBlockElementType
 
@@ -144,7 +145,7 @@ class TestOneNote(unittest.TestCase):
             md_file.write(TEST_FM + TEST_MD)
 
         # Initialize tool to test
-        self.on = OneNoteTools(MONGO_URI, "test_db", "test_blocks", "test_gridFS")
+        self.on = OneNoteTools(MONGO_URI)
 
     def test_current_dir_path(self):
         assert not self.on._current_dir_path
@@ -168,8 +169,8 @@ class TestOneNote(unittest.TestCase):
         docblocks_per_test_doc = len(self.on._parse_page_from_file(self.test_md_path))
 
         # Clean mongo
-        self.on._manager.reset_collection()
-        self.on._manager.reset_resources()
+        self.on._manager.reset_collections()
+        self.on._manager.reset_grids()
 
         # Clean test dir
         self.test_md_path.unlink()
@@ -233,9 +234,10 @@ class TestOneNote(unittest.TestCase):
                 with (export_dir / filename).open("x"):
                     pass
         missed_files = self.on.upload_oneNote_export(self.on_test_dir)
-        assert self.on._manager._docblock_col.count_documents({}) == valid_count * docblocks_per_test_doc
+        db_collection, _ = self.on._manager.get_collection(DocManager.DOC_BLOCKS)
+        assert db_collection.count_documents({}) == valid_count * docblocks_per_test_doc
         assert len(missed_files) == invalid_count
-        self.on._manager.reset_collection()
+        self.on._manager.reset_collections()
 
         # Make some resource files
         resource_count = 20
@@ -245,19 +247,20 @@ class TestOneNote(unittest.TestCase):
                 f.write("Hello!")
 
         self.on.upload_oneNote_export(self.on_test_dir)
-        assert self.on._manager._docblock_col.count_documents({}) == valid_count * docblocks_per_test_doc
-        assert self.on._manager._gridFS_db.get_collection("fs.files").count_documents({}) == resource_count
+        assert db_collection.count_documents({}) == valid_count * docblocks_per_test_doc
+        grid_db, _ = self.on._manager.get_grid(DocManager.RESOURCES)
+        assert grid_db.get_collection("fs.files").count_documents({}) == resource_count
 
         # Check page blocks for relative paths
-        page_list = self.on._manager.find_blocks(type=DocBlockElementType.PAGE)
+        page_list = self.on._manager.find_in_col(collection_name=DocManager.DOC_BLOCKS, type=DocBlockElementType.PAGE)
         assert len(page_list) == valid_count
         for page in page_list:
             assert page.block_attr["export_name"] == export_name
             assert page.block_attr["export_relative_path"] in valid_names
 
         # Clean Mongo
-        self.on._manager.reset_collection()
-        self.on._manager.reset_resources()
+        self.on._manager.reset_collections()
+        self.on._manager.reset_grids()
 
     def test_upload_md_dir(self):
         with pytest.raises(FileNotFoundError):
@@ -284,20 +287,22 @@ class TestOneNote(unittest.TestCase):
 
         missed_files = self.on.upload_md_dir(self.on_test_dir)
         docblock_count_per_test_file = len(self.on._parse_page_from_file(self.test_md_path))
-        docblock_count_mongo = self.on._manager._docblock_col.count_documents({})
+        db_col, _ = self.on._manager.get_collection(DocManager.DOC_BLOCKS)
+        docblock_count_mongo = db_col.count_documents({})
         assert len(missed_files) == invalid_doc_num
         assert docblock_count_mongo == (valid_doc_num + initial_doc_count) * docblock_count_per_test_file
 
-        self.on._manager.reset_collection()
+        self.on._manager.reset_collections()
 
     def test_upload_block_list(self):
-        self.on._manager.reset_collection()
+        self.on._manager.reset_collections()
         docNum = 1000
         block_list = [DocBlockElement(type=DocBlockElementType.PAGE, name=str(num)) for num in range(docNum)]
         self.on._upload_block_list(block_list)
-        assert self.on._manager._docblock_col.count_documents({}) == docNum
+        db_col, _ = self.on._manager.get_collection(DocManager.DOC_BLOCKS)
+        assert db_col.count_documents({}) == docNum
 
-        self.on._manager.reset_collection()
+        self.on._manager.reset_collections()
 
     def test_parse_page_from_file(self):
         a_directory = self.on_test_dir / "bogus_dir"
@@ -351,14 +356,14 @@ class TestFullUpload(unittest.TestCase):
     def setUp(self):
         if not MONGO_URI:
             raise AttributeError("MONGO_URI environment variable not set. Set it in .env")
-        self.db_name = "Full_Export_Test_DB"
-        self.gridFS_name = "Full_Export_Test_DB_GridFS"
-        self.on = OneNoteTools(db_uri=MONGO_URI, db_name=self.db_name, gridfs_name=self.gridFS_name)
+        self.db_name = "Full-Export-One-Note-DocBlocks"
+        self.gridFS_name = "Full-Export-One-Note-Resources"
+        self.on = OneNoteTools(db_uri=MONGO_URI, docblock_db_name=self.db_name, grid_db_name=self.gridFS_name, col_name="full_docBlocks")
 
     def test_full_export(self):
         if not TEST_DIR:
             raise AttributeError("TEST_DIR environment variable not set. Set it in .env to point to a onenote export.")
-        self.on._manager.reset_collection()
-        self.on._manager.reset_resources()
+        self.on._manager.reset_collections()
+        self.on._manager.reset_grids()
         missed_files = self.on.upload_oneNote_export(TEST_DIR)
         assert len(missed_files) == 0

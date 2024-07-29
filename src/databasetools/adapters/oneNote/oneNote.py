@@ -2,6 +2,7 @@ import os
 from builtins import Exception
 from pathlib import Path
 from typing import List
+from typing import Optional
 from typing import Union
 
 import frontmatter
@@ -14,8 +15,16 @@ from databasetools.utils.docBlock.docBlock_utils import ToDocBlock
 
 
 class OneNoteTools:
-    def __init__(self, db_uri: str, db_name: str, blocks_collection_name: str = "blocks", gridfs_name: str = "resources"):
-        self._manager = DocManager(db_uri, db_name, gridfs_name, blocks_collection_name)
+    def __init__(
+        self, db_uri: str, docblock_db_name: Optional[str] = None, grid_db_name: Optional[str] = None, col_name: Optional[str] = None
+    ):
+        collection_info = None if col_name is None else (col_name, DocBlockElement)
+        self._manager = DocManager(
+            mongo_uri=db_uri, doc_block_db_name=docblock_db_name, gridFS_db_names=grid_db_name, docblock_col_infos=collection_info
+        )
+        self._resource_name = grid_db_name if grid_db_name is not None else DocManager.RESOURCES
+        self._col_name = col_name if col_name is not None else DocManager.DOC_BLOCKS
+
         self.__current_dir_name = None
         self.__current_dir_path = None
         self.__current_export_id = None
@@ -133,7 +142,7 @@ class OneNoteTools:
             block_list (List[DocBlockElement]): List of elements to upload to the Mongo instance attached to this class.
         """
         for item in block_list:
-            self._manager.upload_block(item)
+            self._manager.upload_to_col(self._col_name, item)
 
     def _parse_page_from_file(self, file_path: Union[Path, str]) -> List[DocBlockElement]:
         """Parses a Markdown file into a list of DocBlockElements with the first element of the list being the page block.
@@ -207,15 +216,15 @@ class OneNoteTools:
             extension = item_path.suffix
 
             with item_path.open("rb") as f:
-                self._manager.fs_store_file(f.read(), filename=item_name, extension=extension)
+                self._manager.upload_to_grid(self._resource_name, f.read(), filename=item_name, extension=extension)
 
     def verify_references(self):
         missing_resource = []
-        items = self._manager.find_blocks(type="resource_reference")
+        items = self._manager.find_in_col(self._col_name, type="resource_reference")
         for item in items:
             filename = item.block_attr["filename"]
             extension = item.block_attr["extension"]
-            result = self._manager.fs_find_file(filename=filename, extension=extension)
+            result = self._manager.find_in_grid(self._resource_name, filename=filename, extension=extension)
             if result:
                 item.status = "Verified"
             else:
@@ -223,7 +232,7 @@ class OneNoteTools:
         return missing_resource
 
     def get_resource(self, file_name: str, extension: str):
-        grid_out = self._manager.fs_find_file(filename=file_name, extension=extension)
+        grid_out = self._manager.find_in_grid(self._resource_name, filename=file_name, extension=extension)
         return grid_out.read()
 
 
