@@ -325,8 +325,6 @@ class TestOneNote(unittest.TestCase):
         assert page_block.type == DocBlockElementType.PAGE
         attrs = page_block.block_attr
         assert attrs
-        assert attrs["oneNote_page_id"]
-        assert attrs["oneNoteId"]
         assert attrs["oneNote_created_at"]
         assert attrs["oneNote_modified_at"]
         assert attrs["oneNote_path"]

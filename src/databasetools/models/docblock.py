@@ -5,10 +5,11 @@ from typing import List
 from typing import Optional
 
 from bson import ObjectId
+from pydantic import BaseModel
+from pydantic import ConfigDict
 from pydantic import Field
 
 from .common import Element
-from .common import Relationship
 
 
 class DocBlockElementType(str, Enum):
@@ -53,15 +54,19 @@ class DocBlockElement(Element):
     block_content: Optional[str] = Field(None, description="The content stored in this block")
     block_attr: Optional[Dict[str, Any]] = Field(None, description="Document block specific attributes")
     children: Optional[List[ObjectId]] = Field([], description="Ordered list of children blocks")
+    export_id: Optional[ObjectId] = Field(None, description="For pages that are from an export which get assigned an ID.")
 
 
-class BlockRelationship(Relationship):
-    """
-    Should store intra-page relationships. eg. relationships between blocks
-    """
+class FileTypes(str, Enum):
+    DIRECTORY = "directory"
+    FILE = "file"
 
 
-class PageRelationship(Relationship):
-    """
-    Should store relationships between PageElement's to BlockElement's
-    """
+class FileElement(BaseModel):
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    id: ObjectId = Field(default_factory=ObjectId, description="The unique identifier of the element.")
+    type: Optional[FileTypes] = Field(None, description="Either a directory or a file")
+    name: Optional[str] = Field(None, description="Name of the file element")
+    children: Optional[List[ObjectId]] = Field(None, description="Only valid if type is a directory")
+    child_of: Optional[ObjectId] = Field(None, description="ObjectId of the parent directory")

@@ -153,8 +153,14 @@ class FromDocBlock:
         for token in token_list:
             block_state.append_token(token)
 
-        md_render = mistune.Markdown(renderer=renderer, plugins=[table])
-        return (md_render.render_state(block_state), parser._required_resources.copy())
+        converter = mistune.Markdown(renderer=renderer, plugins=[table])
+        result = converter.render_state(block_state)
+
+        to_html = mistune.Markdown(renderer=mistune.HTMLRenderer(escape=False), plugins=[table])
+        to_html.block.list_rules += ["table"]
+        html_content = to_html.parse(result)[0]
+
+        return (html_content, parser._required_resources.copy())
 
     def make_token(self, block: DocBlockElement) -> Dict[str, Any]:
         b_type = block.type

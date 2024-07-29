@@ -5,6 +5,7 @@ from typing import List
 from typing import Union
 
 import frontmatter
+from bson import ObjectId
 
 from databasetools.managers.docs_manager import DocManager
 from databasetools.models.docblock import DocBlockElement
@@ -17,6 +18,7 @@ class OneNoteTools:
         self._manager = DocManager(db_uri, db_name, gridfs_name, blocks_collection_name)
         self.__current_dir_name = None
         self.__current_dir_path = None
+        self.__current_export_id = None
 
     @property
     def _current_dir_name(self):
@@ -26,6 +28,10 @@ class OneNoteTools:
     def _current_dir_path(self):
         return self.__current_dir_path
 
+    @property
+    def _current_export_id(self):
+        return self.__current_export_id
+
     @_current_dir_path.setter
     def _current_dir_path(self, dir_path: Union[Path, str]):
         if self._current_dir_path:
@@ -33,11 +39,13 @@ class OneNoteTools:
         else:
             self.__current_dir_path = Path(dir_path)
             self.__current_dir_name = self.__current_dir_path.name
+            self.__current_export_id = ObjectId()
 
     @_current_dir_path.deleter
     def _current_dir_path(self):
         self.__current_dir_path = None
         self.__current_dir_name = None
+        self.__current_export_id = None
 
     def upload_oneNote_export(self, dir_path: Union[Path, str]) -> List[Union[Path, str]]:
         """Tailored to upload oneNote exports which should contain a "resources" folder and another folder containing the markdown content. Uploads both the resources and Markdown as DocBlockElements into the MongoDB instance.
@@ -161,16 +169,20 @@ class OneNoteTools:
             relative_path = os.path.relpath(file_path, self._current_dir_path)
 
         new_attrs = {
-            "oneNote_page_id": metadata.get("id"),
-            "oneNoteId": metadata.get("oneNoteId"),
             "oneNote_created_at": metadata.get("created"),
             "oneNote_modified_at": metadata.get("updated"),
             "oneNote_path": metadata.get("oneNotePath"),
-            "export_name": self.__current_dir_name,
+            "export_name": self._current_dir_name,
             "export_relative_path": relative_path,
         }
 
-        new_block = DocBlockElement(type=DocBlockElementType.PAGE, children=id_list, name=str(metadata.get("title")), block_attr=new_attrs)
+        new_block = DocBlockElement(
+            type=DocBlockElementType.PAGE,
+            children=id_list,
+            name=str(metadata.get("title")),
+            block_attr=new_attrs,
+            export_id=self._current_export_id,
+        )
 
         block_list.insert(0, new_block)
         return block_list

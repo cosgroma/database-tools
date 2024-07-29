@@ -1,20 +1,21 @@
 import os
 import tempfile
 from pathlib import Path
+from typing import Dict
 from typing import List
 from typing import Optional
 from typing import Union
 
-import mistune
 from atlassian.confluence import Confluence
 from bson import ObjectId
-from mistune.plugins.table import table
 from requests_ratelimiter import LimiterSession
 
 from databasetools.adapters.confluence.cf_adapter import image2cf
 from databasetools.managers.docs_manager import DocManager
 from databasetools.models.docblock import DocBlockElement
 from databasetools.models.docblock import DocBlockElementType
+from databasetools.models.docblock import FileElement
+from databasetools.models.docblock import FileTypes
 from databasetools.utils.docBlock.docBlock_utils import FromDocBlock
 
 
@@ -42,7 +43,7 @@ class ConfluenceManager:
         )
         self.space_key = confluence_space_key
 
-    def upload_pages(self, page_blocks: Union[List[DocBlockElement], DocBlockElement]):
+    def upload_pages(self, page_blocks: Union[List[DocBlockElement], DocBlockElement], root_page_title: Optional[str] = None):
         if isinstance(page_blocks, DocBlockElement):
             page_blocks = [page_blocks]
 
@@ -51,14 +52,12 @@ class ConfluenceManager:
             block_list = self.get_children_block_tree_list(page_block)
 
             content, required_resources = FromDocBlock.render_docBlock(block_list, children_ids, resource_prefix="RESOURCE")
-            conv = mistune.Markdown(renderer=mistune.HTMLRenderer(escape=False), plugins=[table])
-            conv.block.list_rules += ["table"]
-            html_content = image2cf(conv.parse(content)[0])
-
+            content = image2cf(content)
             page_name = self.alias_name(page_block.name)
-            self.make_confluence_page(
-                page_name, html_content, self.get_confluence_page_id("Test Page")
-            )  # ---------------------------------------------------------------------------------------------------------------------- REMOVE "Test Page"
+
+            root_page_title = "Test Page" if root_page_title is None else root_page_title
+
+            self.make_confluence_page(page_name, content, self.get_confluence_page_id(root_page_title))
             page_id = self.get_confluence_page_id(page_name)
             self.download_and_upload_resource(required_resources, page_id)
 
@@ -81,6 +80,30 @@ class ConfluenceManager:
             block_list.extend(self.get_block_tree_list(id))
 
         return block_list
+
+    def make_page_tree(self, export_id: ObjectId):
+        page_list = self.mongo_man.find_blocks(type=DocBlockElementType.PAGE, export_id=export_id)
+        page_dict = {Path(page.block_attr.get("export_relative_path")): page for page in page_list}
+        export_name = page_list[0].block_attr.get("export_name")
+        root = FileElement(type=FileTypes.DIRECTORY, name=export_name)
+        dir_path_list: Dict[Path, FileElement] = {}
+
+        for path in page_dict:
+            for parent in path.parents:
+                if parent not in dir_path_list:
+                    dir_path_list[parent] = FileElement(type=FileTypes.DIRECTORY, name=parent.name)
+                    if len(parent.parents) == 1:
+                        dir_path_list[parent].child_of = root.id
+        dir_path_list.pop(Path())
+        dir_path_list = self.link_file_elements(dir_path_list)
+        return dir_path_list
+
+    def link_file_elements(self, path_element_list: Dict[Path, FileElement]) -> Dict[Path, FileElement]:
+        for element in path_element_list:
+            if path_element_list[element].child_of is None:
+                parent = path_element_list[element.parent]
+                path_element_list[element].child_of = parent.id
+        return path_element_list
 
     def download_and_upload_resource(self, resource_names: Union[str, List[str]], page_id: str):
         if isinstance(resource_names, str):

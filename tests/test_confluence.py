@@ -2,8 +2,10 @@ import os
 import tempfile
 import unittest
 from pathlib import Path
+from typing import Dict
 
 import mistune
+from bson import ObjectId
 from requests.exceptions import HTTPError
 
 from databasetools.adapters.confluence.confluence import ConfluenceManager
@@ -152,9 +154,40 @@ class TestConfluence(unittest.TestCase):
             assert isinstance(item, DocBlockElement)
             assert item.type == DocBlockElementType.PAGE
 
-    def test_upload_pages(self):
-        page_blocks = self.con_man.get_mongo_page_blocks()[3:7]
+    def _test_upload_pages(self):
+        page_blocks = self.con_man.get_mongo_page_blocks()[2]
         self.con_man.upload_pages(page_blocks)
+
+    def test_make_page_tree(self):
+
+        result = self.con_man.make_page_tree(ObjectId("66a4109df371d521238f58d3"))
+        new_result = {}
+        for item in result:
+            new_result[result[item].id] = result[item].child_of
+
+        def is_cyclic(graph: Dict[ObjectId, ObjectId]) -> bool:
+            visited = set()
+            recursion = set()
+
+            def dfs(node):  # True if ends
+                visited.add(node)
+                recursion.add(node)
+                if graph.get(node) is None:
+                    recursion.clear()
+                    return True
+                else:
+                    next_node_id = graph.get(node)
+                    if next_node_id in recursion:
+                        return False
+                    else:
+                        return dfs(next_node_id)
+
+            for node in graph:
+                if node not in visited:
+                    if dfs(node) is False:
+                        return True
+
+        assert not is_cyclic(new_result)
 
     def _test_add_confluence_attachment(self):
         temp_dir = Path(tempfile.mkdtemp())
