@@ -24,7 +24,7 @@ class OneNoteTools:
         self._check_dir()
         self._resource_path = self.root_path / "resources"
         self._export_path = self.root_path / next(
-            [file for file in os.listdir(self.root_path) if file != "resources"]
+            iter([file for file in os.listdir(self.root_path) if file != "resources"])
         )  # This ain't sketchy at all :D
         self._md_file_list, self._folder_list, self._missed_files = self._find_files(self._export_path)
 
