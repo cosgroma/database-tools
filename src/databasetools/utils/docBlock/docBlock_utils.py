@@ -126,7 +126,7 @@ class FromDocBlock:
         renderer: Optional[BaseRenderer] = None,
         resource_prefix: Optional[Union[Path, str]] = None,
     ) -> Tuple[str, List[str]]:
-        """Renders a list of DocBlockElement's into a formatted string.
+        """Renders a list of DocBlockElement's into a formatted string. Defaults to HTML
 
         Args:
             block_list (List[DocBlockElement]): A list of DocBlockElement's that consist of all elements in a document tree/forest.

@@ -1,7 +1,7 @@
 import re
 from re import Match
 
-IMAGE_PATTERN = re.compile(r"""<img src="((?:\w+\/)+(\w+).(\w+))"\s*alt="(\w+)"\s*\/>""")
+IMAGE_PATTERN = re.compile(r"""<img src="((?:\w+\/)*(\w+).(\w+))"\s*alt="(\w+)"\s*\/>""")
 
 
 def image2cf(html_string: str):

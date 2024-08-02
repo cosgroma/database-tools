@@ -5,16 +5,12 @@ from typing import List
 from typing import Optional
 
 from bson import ObjectId
-from pydantic import BaseModel
-from pydantic import ConfigDict
 from pydantic import Field
 
 from .common import Element
 
 
 class DocBlockElementType(str, Enum):
-    PAGE = "page"
-
     TEXT = "text"
     EMPHASIS = "emphasis"
     STRONG = "strong"
@@ -57,16 +53,20 @@ class DocBlockElement(Element):
     export_id: Optional[ObjectId] = Field(None, description="For pages that are from an export which get assigned an ID.")
 
 
-class FileTypes(str, Enum):
-    DIRECTORY = "directory"
-    FILE = "file"
+class PageTypes(str, Enum):
+    PAGE = "page"
+    FOLDER = "folder"
+    EXPORT = "export"
 
 
-class FileElement(BaseModel):
+class PageElement(Element):
+    type: PageTypes
+    children: Optional[List[ObjectId]] = Field([], description="An ordered list of id's to children DocBlocks")
+    sub_folders: Optional[List[ObjectId]] = Field([], description="")
+    export_name: Optional[str] = Field(None, description="")
+    export_id: Optional[ObjectId] = Field(None, description="")
+    relative_path: Optional[str] = Field(None, description="")
 
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-    id: ObjectId = Field(default_factory=ObjectId, description="The unique identifier of the element.")
-    type: Optional[FileTypes] = Field(None, description="Either a directory or a file")
-    name: Optional[str] = Field(None, description="Name of the file element")
-    children: Optional[List[ObjectId]] = Field(None, description="Only valid if type is a directory")
-    child_of: Optional[ObjectId] = Field(None, description="ObjectId of the parent directory")
+    confluence_space_key: Optional[str] = Field(None, description="The space name of the item in confluence")
+    confluence_page_name: Optional[str] = Field(None, description="The aliased name on confluence")
+    confluence_page_id: Optional[str] = Field(None, description="The page id of the confluence page")

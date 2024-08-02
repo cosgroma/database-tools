@@ -1,369 +1,93 @@
 import os
-import secrets
-import shutil
-import tempfile
 import unittest
 from pathlib import Path
 
-import pytest
+from bson import ObjectId
 
-from databasetools.adapters.oneNote.oneNote import AlreadyAttachedToDir
-from databasetools.adapters.oneNote.oneNote import NotMDFileError
-from databasetools.adapters.oneNote.oneNote import NotOneNoteExport
 from databasetools.adapters.oneNote.oneNote import OneNoteTools
-from databasetools.managers.docs_manager import DocManager
 from databasetools.models.docblock import DocBlockElement
-from databasetools.models.docblock import DocBlockElementType
+from databasetools.models.docblock import PageElement
+from databasetools.models.docblock import PageTypes
 
-MONGO_URI = os.getenv("MONGO_URI")
-TEST_DIR = os.getenv("TEST_DIR")
-
-TEST_MD = """
-
-# Heading 1
-
-## Heading 2
-
-### Heading 3
-
-#### Heading 4
-
-##### Heading 5
-
-###### Heading 6
-
-Here is a **BOLD**. Here is an *Italic* and here is a ***BOLD and Italic***
-
-```python
-from peanuts import Peanuts
-peanuts = Peanuts()
-peanuts.roast()
-peanuts.make_peanutbutter()
-```
-
-- Here is a list
-  - I should be a sublist
-  - I am also a sublist
-- I am not a sublist
-- I am also not a sublist
-  - I am a sub list again
-    - I am a sub-sub list.
-
-This is finally a normal paragraph.
-This should be part of the same paragraph.
-
-I should be a separate paragraph.
-I should be in the same paragraph on a different line.
-
-| Here | Is | A | Table |
-| --- | --- | --- | --- |
-| A | B | C | D |
-| A | B | C | D |
-
-1. List item 1
-    1. Sublist item 1
-    1. Sublist item 2
-1. List item 2
-1. List item 3
-
-![This should be an image!](image_url)
-
----
----
-
-Here is a [LINK](a_link)
-
-Here is a [link with a ***bold*** in it](another_link_)
-
-> Here is a quote. Its not that long.
-Here is a break!
-This should be part of the quote.
->> Nested Quote!
->>>>>>> Helloooooooooo
->
-> `Here is a code block`
->
-> ```python
-> import Hello
-> Hello.say()
-> ```
->
->```html
-><!DOCTYPE html>
-><html lang="en">
-><head>
->    <title>My Simple Page</title>
-></head>
-><body>
->    <h1>Welcome to My Webpage</h1>
-></body>
-></html>
->```
-
-Here is a paragraph but I will be embedding a `code block` in it.
-
-This paragraph contains a [reference Link][1]
-
-[![Here is an **image** with a link](image_url)](link_url)
-
-Here is a paragraph with a inline HTML element for a <sup>superscript!</sup> Wowza!
-
-<colgroup>
-<col style="width: 21%" />
-<col style="width: 78%" />
-</colgroup>
-
-**This is a some text with <sup>inline HTML</sup> and a [LINK](http://google.com/).
-
-[1]: Hello
-
-"""
-
-TEST_FM = """
----
-title: How to own a turtle
-id: e8a544a56247455f8db120e2bfc32258
-oneNoteId: '{182A7B13-941F-00A2-210B-8A28D8622AAE}{1}{E1891305927741015750620105221977488905505901}'
-oneNotePath: /right/over/here
-updated: 2022-10-18T04:53:03.0000000-07:00
-created: 2022-04-04T12:20:40.0000000-07:00
----
-"""
+test_env = os.getenv("TEST_DIR")
+assert test_env, "TEST_DIR not set. Set it in .env file"
+TEST_DIR = Path(test_env)
 
 
 class TestOneNote(unittest.TestCase):
-    def setUp(self):
-        # Check mongo
-        if not MONGO_URI:
-            raise AttributeError("MONGO_URI environment variable not set. Set it in .env")
+    def test_init(self):
+        on = OneNoteTools(TEST_DIR)
+        assert on.root_path == Path(TEST_DIR)
+        assert isinstance(on.export_id, ObjectId)
+        assert on._resource_path == Path(TEST_DIR) / "resources"
+        assert on._export_path.exists()
+        assert on._md_file_list
+        dupe_list = []
+        key = [Path(on._export_path, file) for file in Path.glob("**", root_dir=on._export_path, recursive=True)]
+        key.append(on._export_path)
+        for item in on._md_file_list:
+            item_path = Path(on._export_path, item)
+            assert item_path.exists()
+            assert item_path not in dupe_list
+            dupe_list.append(item_path)
 
-        self.on_test_dir = Path(tempfile.mkdtemp())
+            assert item_path in key
 
-        # Write test markdown file
-        self.test_md_path = self.on_test_dir / "test_md.md"
-        with self.test_md_path.open("w") as md_file:
-            md_file.write(TEST_FM + TEST_MD)
+        for item in on._folder_list:
+            item_path = Path(on._export_path, item)
+            assert item_path in key
 
-        # Initialize tool to test
-        self.on = OneNoteTools(MONGO_URI)
+        for item in on._missed_files:
+            item_path = Path(on._export_path, item)
+            assert item_path.exists()
+            assert item_path.suffix != ".md"
 
-    def test_current_dir_path(self):
-        assert not self.on._current_dir_path
-        assert not self.on._current_dir_name
+        assert len(on._md_file_list) + len(on._folder_list) == len(key)
 
-        self.on._current_dir_path = "this/is/a/dumb.path"
-        assert self.on._current_dir_name == "dumb.path"
-        assert self.on._current_dir_path == Path("this/is/a/dumb.path")
+    def test_folder_page_gen(self):
+        on = OneNoteTools(TEST_DIR)
+        assert isinstance(on.folder_page_len(), int)
+        folder_id_key = [on._folder_list[folder] for folder in on._folder_list]
+        page_id_key = [on._md_file_list[file] for file in on._md_file_list]
+        name_key = [Path(folder).name for folder in on._folder_list]
+        for pageElement in on.folder_page_gen():
+            assert isinstance(pageElement, PageElement)
+            assert pageElement.id in folder_id_key
+            assert pageElement.type == PageTypes.FOLDER
+            assert pageElement.name in name_key
+            for folder_id in pageElement.sub_folders:
+                assert folder_id in folder_id_key
+            for child_id in pageElement.children:
+                assert child_id in page_id_key
+            assert pageElement.export_name
+            assert pageElement.export_id
+            assert (on._export_path / pageElement.relative_path).exists()
 
-        with pytest.raises(AlreadyAttachedToDir):
-            self.on._current_dir_path = "replacing/current/path/when/it/is/already/defined.txt"
+    def test_file_page_gen(self):
+        on = OneNoteTools(TEST_DIR)
+        assert isinstance(on.file_page_len(), int)
+        for file_element, block_list, resource_list in on.file_page_gen():
+            assert isinstance(file_element, PageElement)
+            assert isinstance(block_list, list)
+            assert isinstance(resource_list, list)
 
-        del self.on._current_dir_path
-        assert not self.on._current_dir_name
-        assert not self.on._current_dir_path
+            assert file_element.type == PageTypes.PAGE
+            assert file_element.id == on._md_file_list[Path(on._export_path, file_element.relative_path)]
+            assert isinstance(file_element.children, list)
+            assert isinstance(file_element.name, str)
+            assert file_element.created_at
+            assert file_element.modified_at
+            assert file_element.export_name
+            assert file_element.export_id
+            assert file_element.relative_path
 
-    def test_upload_oneNote_export(self):
-        """
-        Still needs to test nested folders
-        """
-        docblocks_per_test_doc = len(self.on._parse_page_from_file(self.test_md_path))
+            id_list = [docblock.id for docblock in block_list]
+            for child_id in file_element.children:
+                assert child_id in id_list
 
-        # Clean mongo
-        self.on._manager.reset_collections()
-        self.on._manager.reset_grids()
+            for block in block_list:
+                assert isinstance(block, DocBlockElement)
+                assert block.export_id == file_element.export_id
 
-        # Clean test dir
-        self.test_md_path.unlink()
-        assert len(os.listdir(self.on_test_dir)) == 0
-
-        # Check if no directory in export folder
-        with pytest.raises(NotOneNoteExport):
-            self.on.upload_oneNote_export(self.on_test_dir)
-
-        # Test having three directories in export folder
-        export_name = "salsa_export"
-        export_dir = self.on_test_dir / export_name
-        export_dir.mkdir()
-        Path(str(export_dir) + "_1").mkdir()
-        Path(str(export_dir) + "_2").mkdir()
-
-        assert len(os.listdir(self.on_test_dir)) == 3
-        with pytest.raises(NotOneNoteExport):
-            self.on.upload_oneNote_export(self.on_test_dir)
-
-        shutil.rmtree(str(export_dir) + "_1")
-        shutil.rmtree(str(export_dir) + "_2")
-
-        # Test with two directories with no resources folder
-        bogus_dir_name = "bologna"
-        (self.on_test_dir / bogus_dir_name).mkdir()
-        with pytest.raises(FileExistsError):
-            self.on.upload_oneNote_export(self.on_test_dir)
-        shutil.rmtree(self.on_test_dir / bogus_dir_name)
-
-        # Test with one directory
-        invalid_file = "poopoo.txt"
-        with (export_dir / invalid_file).open("x"):
-            pass
-        missed_files = self.on.upload_oneNote_export(self.on_test_dir)
-        assert len(missed_files) == 1
-        (export_dir / invalid_file).unlink()
-
-        # Test with two directories one of which is a resources folder
-        resource_dir = self.on_test_dir / "resources"
-        resource_dir.mkdir()
-        assert len(os.listdir(self.on_test_dir)) == 2
-        assert len(os.listdir(resource_dir)) == 0
-        assert len(os.listdir(export_dir)) == 0
-
-        # Make some test md files
-        total_count = 20
-        valid_count = 0
-        invalid_count = 0
-        valid_names = []
-        for i in range(total_count):
-            if secrets.randbits(1):
-                valid_count += 1
-                filename = "valid_file_" + str(i) + ".md"
-                valid_names.append(filename)
-                with (export_dir / filename).open("w") as f:
-                    f.write(TEST_FM + TEST_MD)
-            else:
-                invalid_count += 1
-                filename = "invalid_file_" + str(i) + ".poopoo"
-                with (export_dir / filename).open("x"):
-                    pass
-        missed_files = self.on.upload_oneNote_export(self.on_test_dir)
-        db_collection, _ = self.on._manager.get_collection(DocManager.DOC_BLOCKS)
-        assert db_collection.count_documents({}) == valid_count * docblocks_per_test_doc
-        assert len(missed_files) == invalid_count
-        self.on._manager.reset_collections()
-
-        # Make some resource files
-        resource_count = 20
-        for i in range(resource_count):
-            filename = "resource_" + str(i) + ".txt"
-            with (resource_dir / filename).open("w") as f:
-                f.write("Hello!")
-
-        self.on.upload_oneNote_export(self.on_test_dir)
-        assert db_collection.count_documents({}) == valid_count * docblocks_per_test_doc
-        grid_db, _ = self.on._manager.get_grid(DocManager.RESOURCES)
-        assert grid_db.get_collection("fs.files").count_documents({}) == resource_count
-
-        # Check page blocks for relative paths
-        page_list = self.on._manager.find_in_col(collection_name=DocManager.DOC_BLOCKS, type=DocBlockElementType.PAGE)
-        assert len(page_list) == valid_count
-        for page in page_list:
-            assert page.block_attr["export_name"] == export_name
-            assert page.block_attr["export_relative_path"] in valid_names
-
-        # Clean Mongo
-        self.on._manager.reset_collections()
-        self.on._manager.reset_grids()
-
-    def test_upload_md_dir(self):
-        with pytest.raises(FileNotFoundError):
-            self.on.upload_md_dir("made/up/path/hahaha/hahaha/hahahaha")
-
-        with pytest.raises(NotADirectoryError):
-            self.on.upload_md_dir(self.test_md_path)
-
-        initial_doc_count = len(os.listdir(self.on_test_dir))
-
-        # Make valid documents:
-        valid_doc_num = 20
-        for i in range(valid_doc_num):
-            filename = "valid_file_" + str(i) + ".md"
-            with (self.on_test_dir / filename).open("w") as f:
-                f.write(TEST_FM + TEST_MD)
-
-        # Make some invalid_docs:
-        invalid_doc_num = 5
-        for i in range(invalid_doc_num):
-            filename = "invalid_file_" + str(i) + ".txt"
-            with (self.on_test_dir / filename).open("w") as f:
-                f.write(TEST_FM + TEST_MD)
-
-        missed_files = self.on.upload_md_dir(self.on_test_dir)
-        docblock_count_per_test_file = len(self.on._parse_page_from_file(self.test_md_path))
-        db_col, _ = self.on._manager.get_collection(DocManager.DOC_BLOCKS)
-        docblock_count_mongo = db_col.count_documents({})
-        assert len(missed_files) == invalid_doc_num
-        assert docblock_count_mongo == (valid_doc_num + initial_doc_count) * docblock_count_per_test_file
-
-        self.on._manager.reset_collections()
-
-    def test_upload_block_list(self):
-        self.on._manager.reset_collections()
-        docNum = 1000
-        block_list = [DocBlockElement(type=DocBlockElementType.PAGE, name=str(num)) for num in range(docNum)]
-        self.on._upload_block_list(block_list)
-        db_col, _ = self.on._manager.get_collection(DocManager.DOC_BLOCKS)
-        assert db_col.count_documents({}) == docNum
-
-        self.on._manager.reset_collections()
-
-    def test_parse_page_from_file(self):
-        a_directory = self.on_test_dir / "bogus_dir"
-        a_directory.mkdir()
-        with pytest.raises(TypeError):
-            self.on._parse_page_from_file(a_directory)
-
-        with pytest.raises(FileExistsError):
-            self.on._parse_page_from_file(self.on_test_dir / "boooOOOOgus_file.md")
-
-        no_md_path = self.on_test_dir / "no_md_extension.txt"
-        with (no_md_path).open("w") as file:
-            file.write("glub glub glub")
-        with pytest.raises(NotMDFileError):
-            self.on._parse_page_from_file(no_md_path)
-
-        self.on._current_dir_path = self.on_test_dir
-        block_list = self.on._parse_page_from_file(self.test_md_path)
-        assert block_list
-        assert isinstance(block_list, list)
-        for block in block_list:
-            assert isinstance(block, DocBlockElement)
-        page_block = block_list[0]
-        assert page_block.name == "How to own a turtle"
-        assert page_block.type == DocBlockElementType.PAGE
-        attrs = page_block.block_attr
-        assert attrs
-        assert attrs["oneNote_created_at"]
-        assert attrs["oneNote_modified_at"]
-        assert attrs["oneNote_path"]
-        assert attrs["export_name"] == self.on_test_dir.name
-        assert attrs["export_relative_path"]
-
-        del self.on._current_dir_path
-        block_list = self.on._parse_page_from_file(self.test_md_path)
-        assert block_list
-        assert block_list[0].block_attr["export_name"] is None
-        assert block_list[0].block_attr["export_relative_path"] is None
-
-    def test_store_resources(self):
-        invalid_dir = "/bogus/directory/that/cant/possibly/exist"
-        with pytest.raises(FileNotFoundError):
-            self.on.store_resources(invalid_dir)
-
-    def tearDown(self):
-        if self.on_test_dir.exists():
-            shutil.rmtree(self.on_test_dir)
-
-
-class TestFullUpload(unittest.TestCase):
-    def setUp(self):
-        if not MONGO_URI:
-            raise AttributeError("MONGO_URI environment variable not set. Set it in .env")
-        self.db_name = "Full-Export-One-Note-DocBlocks"
-        self.gridFS_name = "Full-Export-One-Note-Resources"
-        self.on = OneNoteTools(db_uri=MONGO_URI, docblock_db_name=self.db_name, grid_db_name=self.gridFS_name, col_name="full_docBlocks")
-
-    def test_full_export(self):
-        if not TEST_DIR:
-            raise AttributeError("TEST_DIR environment variable not set. Set it in .env to point to a onenote export.")
-        self.on._manager.reset_collections()
-        self.on._manager.reset_grids()
-        missed_files = self.on.upload_oneNote_export(TEST_DIR)
-        assert len(missed_files) == 0
+            for resource in resource_list:
+                assert resource.exists()
