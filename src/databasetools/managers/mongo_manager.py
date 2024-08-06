@@ -13,7 +13,7 @@ from pymongo import MongoClient
 from pymongo.collection import Collection
 from pymongo.database import Database
 
-from ..adapters.confluence.cf_adapter import image2cf
+from ..adapters.confluence.cf_adapter import html_image_2_cf_image
 from ..adapters.confluence.confluence import ConfluenceManager
 from ..adapters.oneNote.oneNote import OneNoteTools
 from ..controller.base_controller import T
@@ -53,6 +53,9 @@ class MongoManager:
         if col_infos is None:
             col_infos = []
 
+        if isinstance(gridFS_db_names, str):  # Store the init name to assign as active grid later
+            init_grid_name = gridFS_db_names
+
         gridFS_db_names = [gridFS_db_names] if isinstance(gridFS_db_names, str) else gridFS_db_names
         col_infos = [col_infos] if isinstance(col_infos, tuple) else col_infos
 
@@ -77,6 +80,8 @@ class MongoManager:
 
         # Will init default grids and collections. Also inits the active variables for easier referencing
         self.set_default_actives()
+
+        self.active_grid = init_grid_name
 
     # Init and class management methods
     @property
@@ -284,7 +289,7 @@ class MongoManager:
                 for resource in required_resources_list:  # Upload resources for each page to gridFS
                     print(f"\tUploading resource {resource.name}")
                     with resource.open("rb") as file:
-                        self.upload_to_grid(self.active_grid, file.read(), name=resource.name)
+                        self.upload_to_grid(self.active_grid, file.read(), name=resource.name, confluence_id=None)
 
                 self.upload_to_col(self.active_page_col, page)
 
@@ -361,7 +366,7 @@ class MongoManager:
         block_list = self._get_block_tree(file_block.children)
 
         content, required_resources = FromDocBlock.render_docBlock(block_list, file_block.children)
-        content = image2cf(content)
+        content = html_image_2_cf_image(content)
 
         try:
             new_page = con_ad.make_confluence_page(file_block.name, content, parent_id)
@@ -389,29 +394,38 @@ class MongoManager:
                 (temp_dir / item).unlink()
             temp_dir.rmdir()
 
-        for resource in resources:
-            print(f"\tUploading {resource}")
-            try:
-                grid_out = self.find_in_grid(self.active_grid, name=resource)
-            except Exception as e:
-                remove_dir()
-                raise Exception(f"Exception occurred while finding: {resource}, in gridFS instance: {self.active_grid}") from e
-
-            if grid_out is None:
-                raise FileNotFoundError(f"Can't find resource: {resource}'")
-
-            temp_file = temp_dir / resource
-            try:
-                with temp_file.open("wb") as file:
-                    file.write(grid_out.read())
-            except Exception as e:
-                remove_dir()
-                raise Exception(f"Exception occurred while attempting to read: {resource}, from gridFS instance {self.active_grid}") from e
-
         try:
-            con_ad.add_confluence_attachments(temp_dir, page_id_to_add_attachments)
-        except Exception as e:
-            raise Exception(f"Exception occurred while attempting to upload, {resource} to gridFS instance {self.active_grid}") from e
+            for resource in resources:
+                print(f"\tUploading {resource}")
+                try:
+                    grid_out = self.find_in_grid(self.active_grid, name=resource)
+                except Exception as e:
+                    remove_dir()
+                    raise Exception(f"Exception occurred while finding: {resource}, in gridFS instance: {self.active_grid}") from e
+
+                if grid_out is None:
+                    raise FileNotFoundError(f"Can't find resource: {resource}'")
+
+                temp_file = temp_dir / resource
+                try:
+                    with temp_file.open("wb") as file:
+                        file.write(grid_out.read())
+                except Exception as e:
+                    remove_dir()
+                    raise Exception(
+                        f"Exception occurred while attempting to read: {resource}, from gridFS instance {self.active_grid}"
+                    ) from e
+
+                try:
+                    response = con_ad.add_confluence_attachments(temp_file, page_id_to_add_attachments)
+                    fs_file_col = self._grids[self.active_grid][0].get_collection("fs.files")
+                    fs_file_col.update_one(filter={"name": resource}, update={"$set": {"confluence_id": response["results"][0]["id"]}})
+                    temp_file.unlink()
+                except Exception as e:
+                    raise Exception(
+                        f"Exception occurred while attempting to upload, {resource} to gridFS instance {self.active_grid}"
+                    ) from e
+
         finally:
             remove_dir()
 

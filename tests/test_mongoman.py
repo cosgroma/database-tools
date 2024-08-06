@@ -85,7 +85,7 @@ class TestMongMan(unittest.TestCase):
         assert len(mongo_man._collections) == 4
 
     def test_full_upload(self):
-        mm = MongoManager(MONGO_URI)
+        mm = MongoManager(MONGO_URI, "TEST_2", "TEST_2_Grid")
         export_element: List[PageElement] = mm.find_in_col(mm.active_page_col, type=PageTypes.EXPORT)
         if export_element:
             export_id = export_element[0].id

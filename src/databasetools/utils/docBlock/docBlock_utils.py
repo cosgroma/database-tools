@@ -20,8 +20,8 @@ from mistune.core import BlockState
 from mistune.plugins.table import table
 from mistune.renderers.markdown import MarkdownRenderer
 
-from databasetools.models.docblock import DocBlockElement
-from databasetools.models.docblock import DocBlockElementType
+from ...models.docblock import DocBlockElement
+from ...models.docblock import DocBlockElementType
 
 DEBUG = False
 
@@ -360,7 +360,6 @@ class ToDocBlock:
         Returns:
             Tuple[List[DocBlockElement], List[ObjectId]]: The first element of the tuple is a list of the parsed DocBlockElements. The second element is a list of objectId's that correspond to the highest level DocBlockElements.
         """
-        md = cls.transform_md(md)
         parser = cls(mode_set=mode)
         token_list = parser.md_to_token(md)
         id_list = []
@@ -634,15 +633,6 @@ class ToDocBlock:
             return match.group(1)
         else:
             raise NotRelativeURIWarning(f"Provided token does not contain a relative URI for a oneNote Export: {token}")
-
-    @staticmethod
-    def transform_md(markdown: str) -> str:
-        TABLE_PATTERN = r"((?:\|.+){1}\n(?:(?:\|:?-+:?)+\|)(?:\n\|.+)+)"
-
-        def replace(m: re.Match):
-            return f"""\n\n{m.group(0)}\n\n"""
-
-        return re.sub(TABLE_PATTERN, replace, markdown)
 
 
 class NotRelativeURIWarning(Exception):

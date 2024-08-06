@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 from typing import Optional
 from typing import Union
@@ -147,8 +146,6 @@ class ConfluenceManager:
         print(f'''Created page, "{new_title}"''')
         return new_page
 
-    def add_confluence_attachments(self, resource_dir: Union[Path, str], page_id: str):
+    def add_confluence_attachments(self, resource_dir: Union[Path, str], page_id: str) -> dict:
         resource_dir = Path(resource_dir)
-        for item in os.listdir(resource_dir):
-            item_path = resource_dir / item
-            self.confluence_client.attach_file(filename=item_path, page_id=page_id)
+        return self.confluence_client.attach_file(filename=resource_dir, page_id=page_id)
