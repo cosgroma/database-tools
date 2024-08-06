@@ -1,6 +1,5 @@
 import os
 import unittest
-from pprint import pprint
 
 from databasetools.adapters.confluence.confluence import ConfluenceManager
 
@@ -131,5 +130,5 @@ class TestConfluence(unittest.TestCase):
         )
 
     def test_ty(self):
-        thing = self.con_man.make_confluence_page_directory("bob")
-        pprint(thing, sort_dicts=False)
+        parent_id = self.con_man.get_confluence_page_id("Test Page")
+        self.con_man.remove_pages_from_parent(parent_id)

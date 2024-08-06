@@ -1,10 +1,12 @@
 import os
 import unittest
 from pathlib import Path
+from typing import List
 
 from databasetools.managers.mongo_manager import MongoManager
 from databasetools.models.docblock import DocBlockElement
 from databasetools.models.docblock import PageElement
+from databasetools.models.docblock import PageTypes
 
 MONGO_URI = os.getenv("MONGO_URI")
 TEST_DIR = os.getenv("TEST_DIR")
@@ -84,5 +86,9 @@ class TestMongMan(unittest.TestCase):
 
     def test_full_upload(self):
         mm = MongoManager(MONGO_URI)
-        export_id = mm.upload_one_note(TEST_DIR)
+        export_element: List[PageElement] = mm.find_in_col(mm.active_page_col, type=PageTypes.EXPORT)
+        if export_element:
+            export_id = export_element[0].id
+        else:
+            export_id = mm.upload_one_note(TEST_DIR)
         mm.upload_confluence(export_id, parent_title="Test Page")
