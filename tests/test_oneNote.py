@@ -4,7 +4,7 @@ from pathlib import Path
 
 from bson import ObjectId
 
-from databasetools.adapters.oneNote.oneNote import OneNoteTools
+from databasetools.adapters.oneNote.oneNote import OneNote_2_MongoBlocks
 from databasetools.models.docblock import DocBlockElement
 from databasetools.models.docblock import PageElement
 from databasetools.models.docblock import PageTypes
@@ -16,7 +16,7 @@ TEST_DIR = Path(test_env)
 
 class TestOneNote(unittest.TestCase):
     def test_init(self):
-        on = OneNoteTools(TEST_DIR)
+        on = OneNote_2_MongoBlocks(TEST_DIR)
         assert on.root_path == Path(TEST_DIR)
         assert isinstance(on.export_id, ObjectId)
         assert on._resource_path == Path(TEST_DIR) / "resources"
@@ -45,7 +45,7 @@ class TestOneNote(unittest.TestCase):
         assert len(on._md_file_list) + len(on._folder_list) == len(key)
 
     def test_folder_page_gen(self):
-        on = OneNoteTools(TEST_DIR)
+        on = OneNote_2_MongoBlocks(TEST_DIR)
         assert isinstance(on.folder_page_len(), int)
         folder_id_key = [on._folder_list[folder] for folder in on._folder_list]
         page_id_key = [on._md_file_list[file] for file in on._md_file_list]
@@ -64,7 +64,7 @@ class TestOneNote(unittest.TestCase):
             assert (on._export_path / pageElement.relative_path).exists()
 
     def test_file_page_gen(self):
-        on = OneNoteTools(TEST_DIR)
+        on = OneNote_2_MongoBlocks(TEST_DIR)
         assert isinstance(on.file_page_len(), int)
         for file_element, block_list, resource_list in on.file_page_gen():
             assert isinstance(file_element, PageElement)

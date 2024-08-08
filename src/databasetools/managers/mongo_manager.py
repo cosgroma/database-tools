@@ -1,6 +1,8 @@
+import logging
 import os
 import re
 import tempfile
+import urllib.parse
 from pathlib import Path
 from typing import Dict
 from typing import List
@@ -17,13 +19,14 @@ from pymongo.database import Database
 
 from ..adapters.confluence.cf_adapter import cf_post_process
 from ..adapters.confluence.confluence import ConfluenceManager
-from ..adapters.oneNote.oneNote import OneNoteTools
+from ..adapters.oneNote.oneNote import OneNote_2_MongoBlocks
 from ..controller.base_controller import T
 from ..controller.mongo_controller import MongoCollectionController
 from ..models.docblock import DocBlockElement
 from ..models.docblock import PageElement
 from ..models.docblock import PageTypes
 from ..utils.docBlock.docBlock_utils import FromDocBlock
+from ..utils.log import logger
 
 """
     Usage:
@@ -292,39 +295,65 @@ class MongoManager:
         grid_dude = self._grids[grid_name][1]  # 1 is the grid client
         return grid_dude.find_one(dict(kwargs))
 
+    def del_many_in_col(self, collection_name: str, **kwargs):
+        controller = self._collections[collection_name][1]  # Collection controller is second element of collections tuple
+        return controller.delete(dict(kwargs))
+
+    def del_in_grid(self, grid_name: str, **kwargs):
+        grid_dude = self._grids[grid_name][1]
+        grid_collection = self._grids[grid_name][0].get_collection("fs.files")
+        docs = grid_collection.find(dict(kwargs))
+        id_list = [doc["_id"] for doc in docs]
+        for id in id_list:
+            grid_dude.delete(id)
+
     # One Note export upload things
-    def upload_one_note(self, dir_path: Union[Path, str]) -> ObjectId:
-        on = OneNoteTools(dir_path)
+    def upload_one_note_2_mongo(self, dir_path: Union[Path, str]) -> ObjectId:
+        on = OneNote_2_MongoBlocks(dir_path)
         export_page = on.get_export_page()
-        print(f"Beginning export: {export_page.name}")
-        self.upload_to_col(self.active_page_col, export_page)
+        export_id = on.export_id
+        logger.info(f"Beginning export: {export_page.name}")
+
         try:  # To catch any error during upload to mongo. If there are errors, you might not have a complete upload to mongo but there is no way to "pick up" from where we left off so we delete all progress before we exit.
-            for folder_page in on.folder_page_gen():  # Upload folder pages to mongo
-                print(f"Uploading info page for: {folder_page.relative_path}")
-                self.upload_to_col(self.active_page_col, folder_page)
-
-            for page, block_list, required_resources_list in on.file_page_gen():  # Upload page pages to mongo
-                print(f"Uploading page: {page.relative_path}")
-                for block in block_list:
-                    self.upload_to_col(self.active_db_col, block)
-
-                for resource in required_resources_list:  # Upload resources for each page to gridFS
-                    print(f"\tUploading resource {resource.name}")
-                    with resource.open("rb") as file:
-                        self.upload_to_grid(self.active_grid, file.read(), name=resource.name, confluence_id=None)
-
-                self.upload_to_col(self.active_page_col, page)
-
+            self.upload_to_col(self.active_page_col, export_page)
+            self._upload_OneNote_folder_struct(on)
+            self._upload_OneNote_files(on)
             return export_page.id
         except BaseException as e:  # If there is any error during the upload, we should drop all progress we have made so far.
-            # Ideally, we should make a more elegant solution such as deleting all previously uploaded blocks in this instance.
-            self._db_db.drop_collection(self.active_db_col)
-            self._db_db.drop_collection(self.active_page_col)
-            self._mongo_client.drop_database(self.active_grid)
+            self._clean_incomplete_mongo_upload(export_id)
             raise IncompleteUpload(
                 "Failed to completely upload all data from export to mongo. Deleting partial upload to prevent corruption."
             ) from e
 
+    def _upload_OneNote_folder_struct(self, ON_adapter: OneNote_2_MongoBlocks) -> None:
+        for folder_page in ON_adapter.folder_page_gen():
+            logger.info(f"Uploading info page for: {folder_page.relative_path}")
+            self.upload_to_col(self.active_page_col, folder_page)
+
+    def _upload_OneNote_files(self, ON_adapter: OneNote_2_MongoBlocks) -> None:
+        for page, block_list, required_resources_list in ON_adapter.file_page_gen():  # Upload page pages to mongo
+            logger.info(f"Uploading page: {page.relative_path}")
+            for block in block_list:
+                self.upload_to_col(self.active_db_col, block)
+
+            for resource in required_resources_list:  # Upload resources for each page to gridFS
+                logger.info(f"\tUploading resource {resource.name}")
+                with resource.open("rb") as file:
+                    self.upload_to_grid(
+                        self.active_grid, file.read(), name=resource.name, confluence_id=None, export_id=ON_adapter.export_id
+                    )
+
+            self.upload_to_col(self.active_page_col, page)
+
+    def _clean_incomplete_mongo_upload(self, export_id: ObjectId):
+        logger.info("Begin cleaning export from Mongo")
+        self.del_many_in_col(self.active_db_col, export_id=export_id)
+        self.del_many_in_col(self.active_page_col, export_id=export_id)
+        self.del_in_grid(self.active_grid, export_id=export_id)
+        logger.info("Finished cleaning mongo")
+        logger.critical("Failed to finish upload to mongo!")
+
+    # Confluence Upload things
     def upload_confluence(self, export_id: ObjectId, parent_id: Optional[str] = None, parent_title: Optional[str] = None) -> bool:
         if parent_id is None:  # Establish "root" page on confluence
             if parent_title:
@@ -345,7 +374,7 @@ class MongoManager:
             self.active_page_col, type=PageTypes.FOLDER
         )  # Finds all folders then determines if its child pages need to be made on confluence
 
-        print("Begin uploading files to confluence:")
+        logger.info("Begin uploading files to confluence:")
         for folder_element in folder_page_elements:  # For each page in each folder...
             if not folder_element.children:
                 continue
@@ -369,31 +398,31 @@ class MongoManager:
                         try:
                             page = self.con_ad.confluence_client.get_page_by_id(file_block.confluence_page_id)
                             self.con_ad.delete_page(file_block.confluence_page_id)
-                            print(f"Restarting page upload for: {page['title']}")
+                            logger.info(f"Restarting page upload for: {page['title']}")
                         except ApiError:
                             file_block.confluence_page_name = None
                             file_block.confluence_space_key = None
                         file_block.confluence_page_id = None
+
                     try:
-                        print(f"Reconstructing page {file_block.name}")
+                        logger.info(f"Reconstructing page {file_block.name}")
                         updated_block = self._construct_page(file_block, folder_element.confluence_page_id)
                     except IncompleteUpload as e:
-                        file_block.confluence_page_id = page_id
-                        self.update_to_col(self.active_page_col, file_block, id=file_block.id)
-                        raise e
+                        if len(e.args) == 2:
+                            file_block.confluence_page_id = e.args[1]
+                            self.update_to_col(self.active_page_col, file_block, id=file_block.id)
+                        else:
+                            raise e
 
-                    if not self.update_to_col(self.active_page_col, updated_block, id=updated_block.id):
-                        raise RuntimeError(f"Failed to update block: {updated_block}")
-                else:
-                    continue
+                    self.update_to_col(self.active_page_col, updated_block, id=updated_block.id)
 
     def _construct_page(self, file_block: PageElement, parent_id: str) -> PageElement:
         block_list = self._get_block_tree(file_block.children)
 
         content, required_resources = FromDocBlock.render_docBlock(block_list, file_block.children)
 
-        try:
-            new_page = self.con_ad.make_confluence_page(file_block.name, None, parent_id)
+        try:  # Make an empty page
+            new_page = self.con_ad.make_confluence_page(file_block.name, "Under construction...", parent_id)
             new_page_name = new_page["title"]
             new_page_id = new_page["id"]
         except Exception as e:
@@ -401,17 +430,20 @@ class MongoManager:
                 f"Exception occurred while uploading page with file block: \n{file_block}\n\nWith content: \n{content}"
             ) from e
 
-        try:
+        try:  # Upload attachments
             self._add_attachment(required_resources, new_page_id)
         except Exception as e:
-            raise IncompleteUpload(f"Exception occurred during upload of page {new_page_id}") from e
+            raise IncompleteUpload(f"Exception occurred during upload of page {new_page_id}", new_page_id) from e
 
+        # Do final content formatting
         content = self.format_final_html(content, new_page_name, new_page_id)
-        try:
+
+        try:  # Update the empty page with the formatted content
             self.con_ad.update_confluence_page(new_page_id, new_page_name, content)
         except Exception as e:
-            raise IncompleteUpload(f"Exception occurred while trying to update page {new_page_id}") from e
+            raise IncompleteUpload(f"Exception occurred while trying to update page {new_page_id}", new_page_id) from e
 
+        # Update blocks to contain the correct info
         file_block.confluence_page_id = new_page_id
         file_block.confluence_page_name = new_page_name
         file_block.confluence_space_key = new_page["space"]["key"]
@@ -433,7 +465,11 @@ class MongoManager:
                 con_url = self.confluence_url
             else:
                 con_url = self.confluence_url + "/"
-            return f"""<a href="{con_url}display/{self.confluence_space_key}/{page_name}?preview=/{page_id}/{attachment_confluence_id}">{m.group(2)}</a>"""
+
+            esc_con_space_key = urllib.parse.quote_plus(self.confluence_space_key)
+            esc_page_name = urllib.parse.quote_plus(page_name)
+
+            return f"""<a href="{con_url}display/{esc_con_space_key}/{esc_page_name}?preview=/{page_id}/{attachment_confluence_id}">{m.group(2)}</a>"""
 
         return re.sub(MISC_ATTACHMENT_PATTERN, repl, content)
 
@@ -447,7 +483,7 @@ class MongoManager:
 
         try:
             for resource in resources:
-                print(f"\tUploading {resource}")
+                logger.info(f"Uploading {resource}")
                 try:
                     grid_out = self.find_in_grid(self.active_grid, name=resource)
                 except Exception as e:
@@ -455,6 +491,7 @@ class MongoManager:
                     raise Exception(f"Exception occurred while finding: {resource}, in gridFS instance: {self.active_grid}") from e
 
                 if grid_out is None:
+                    remove_dir()
                     raise FileNotFoundError(f"Can't find resource: {resource}'")
 
                 temp_file = temp_dir / resource
@@ -487,7 +524,6 @@ class MongoManager:
                     raise Exception(
                         f"Exception occurred while attempting to upload, {resource} to gridFS instance {self.active_grid}"
                     ) from e
-
         finally:
             remove_dir()
 
@@ -512,6 +548,37 @@ class MongoManager:
             block_list.append(this_block)
 
         return block_list
+
+    # Debug a page. Prints out a page tree.
+    def print_debug_tree(self, page_element_id: Union[ObjectId, str]):
+        if isinstance(page_element_id, str):
+            page_element_id = ObjectId(page_element_id)
+
+        page_element: PageElement = self.find_one_in_col(self.active_page_col, id=page_element_id)
+        if not isinstance(page_element, PageElement):
+            raise KeyError(f"Id provided to print correlates to an object that is not a page element! id: {page_element_id}")
+
+        def make_children_list(block_dict: Dict[ObjectId, DocBlockElement], block: DocBlockElement) -> List[str]:
+            if block.block_content is not None:
+                print_list = [f"Block Element id: {block.id!s}\tType: {block.type}\tRaw: {block.block_content}"]
+            else:
+                print_list = [f"Block Element id: {block.id!s}\tType: {block.type}"]
+            for cblock_id in block.children:
+                c_list = make_children_list(block_dict, block_dict[cblock_id])
+                for i in range(len(c_list)):
+                    c_list[i] = f"\t{c_list[i]}"
+                print_list.extend(c_list)
+            return print_list
+
+        print_list = [f"\nPage Element id: {page_element.id}\tName: {page_element.name}\tExport id: {page_element.export_id}"]
+        block_list = self._get_block_tree(page_element.children)
+        block_dict = {block.id: block for block in block_list}
+        for block_id in page_element.children:
+            new_list = make_children_list(block_dict, block_dict[block_id])
+            print_list.extend(new_list)
+
+        for item in print_list:
+            logging.debug(item)
 
 
 class IncompleteUpload(Exception):

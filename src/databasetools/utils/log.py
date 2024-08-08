@@ -7,7 +7,9 @@ import logging
 import coloredlogs
 from termcolor import colored
 
-logger = logging.getLogger("work.cosgroma.db-man")
+LOG_NAME = "work.cosgroma.db-man"
+
+logger = logging.getLogger(LOG_NAME)
 
 
 class LoggerArgs:
@@ -48,7 +50,7 @@ def init_logger(args: LoggerArgs):
         },
     )
 
-    logging.getLogger("work.cosgroma.db-man").level = logging.WARN if args.quiet else (logging.DEBUG if args.verbose else logging.INFO)
+    logging.getLogger(LOG_NAME).level = logging.WARN if args.quiet else (logging.DEBUG if args.verbose else logging.INFO)
 
 
 def headline(msg: str):

@@ -8,6 +8,8 @@ from databasetools.managers.mongo_manager import MongoManager
 from databasetools.models.docblock import DocBlockElement
 from databasetools.models.docblock import PageElement
 from databasetools.models.docblock import PageTypes
+from databasetools.utils.log import LoggerArgs
+from databasetools.utils.log import init_logger
 
 MONGO_URI = os.getenv("MONGO_URI")
 TEST_DIR = os.getenv("TEST_DIR")
@@ -21,6 +23,10 @@ CONFLUENCE_UNAME = os.getenv("CONFLUENCE_UNAME")
 CONFLUENCE_URL = os.getenv("CONFLUENCE_URL")
 CONFLUENCE_SPACE_KEY = os.getenv("CONFLUENCE_SPACE_KEY")
 CONFLUENCE_TOKEN = os.getenv("CONFLUENCE_API_KEY")
+
+RESTART = True
+
+init_logger(LoggerArgs(True))
 
 
 class TestMongMan(unittest.TestCase):
@@ -92,11 +98,13 @@ class TestMongMan(unittest.TestCase):
 
     def test_full_upload(self):
         mm = MongoManager(MONGO_URI, CONFLUENCE_URL, CONFLUENCE_SPACE_KEY, CONFLUENCE_UNAME, CONFLUENCE_TOKEN, "TEST_2", "TEST_2_Grid")
-        export_element: List[PageElement] = mm.find_in_col(mm.active_page_col, type=PageTypes.EXPORT)
+        export_element: List[PageElement] = (
+            mm.find_in_col(mm.active_page_col, type=PageTypes.EXPORT) if RESTART else None
+        )  # Allows us to maintain one upload between different test instances.
         if export_element:
             export_id = export_element[0].id
         else:
-            export_id = mm.upload_one_note(TEST_DIR)
+            export_id = mm.upload_one_note_2_mongo(TEST_DIR)
         try:
             mm.upload_confluence(export_id, parent_title="Test Page")
         except BaseException as e:

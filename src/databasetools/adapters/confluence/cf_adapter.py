@@ -1,6 +1,8 @@
 import re
 from re import Match
 
+from ...utils.log import logger
+
 REVERSE_BOLDED_LISTS = re.compile(r"""\*\*(\d+)\.\s(.+)\*\*""")
 CONJOINED_TABLE_PATTERN = re.compile(
     r"""(?:\|[^\|\n]*)+\|\n(?:\|:?-+:?)+\|\n(?:(?:(?:\|[^\|\n]*)+\|\n)+(?=(?:\|[^\|\n]*)+\|\n(?:\|:?-+:?)+\|\n))"""
@@ -98,9 +100,9 @@ def cf_pre_process(markdown: str) -> str:
         str: Formatted string.
     """
     for func in PRE_PROCESS_FUNCS:
-        print(f"\t\t\tBegin Preprocess... ({func.__name__})")
+        logger.info(f"\t\t\tBegin Preprocess... ({func.__name__})")
         markdown = func(markdown)
-        print("\t\t\tFinished Preprocess")
+        logger.info("\t\t\tFinished Preprocess")
     return markdown
 
 
@@ -124,7 +126,7 @@ def cf_post_process(html_string: str) -> str:
         str: Confluence compatible html string.
     """
     for func in POST_PROCESS_FUNCS:
-        print(f"\t\t\tBegin Post_Process... ({func.__name__})")
+        logger.info(f"\t\t\tBegin Post_Process... ({func.__name__})")
         html_string = func(html_string)
-        print("\t\t\tFinished Post-Processing")
+        logger.info("\t\t\tFinished Post-Processing")
     return html_string
