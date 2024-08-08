@@ -1,4 +1,5 @@
 import os
+import traceback
 import unittest
 from pathlib import Path
 from typing import List
@@ -16,6 +17,11 @@ MONGO_TEST_COLLECTION = "test_collection"
 
 TEST_DIR = Path(TEST_DIR)
 
+CONFLUENCE_UNAME = os.getenv("CONFLUENCE_UNAME")
+CONFLUENCE_URL = os.getenv("CONFLUENCE_URL")
+CONFLUENCE_SPACE_KEY = os.getenv("CONFLUENCE_SPACE_KEY")
+CONFLUENCE_TOKEN = os.getenv("CONFLUENCE_API_KEY")
+
 
 class TestMongMan(unittest.TestCase):
     def test_init(self):
@@ -27,7 +33,7 @@ class TestMongMan(unittest.TestCase):
         newer_col = (newer_col_name, PageElement)
         new_db_db_name = "dbdbdbdbdb_WOOOOO"
 
-        mongo_man = MongoManager(MONGO_URI)
+        mongo_man = MongoManager(MONGO_URI, CONFLUENCE_URL, CONFLUENCE_SPACE_KEY, CONFLUENCE_UNAME, CONFLUENCE_TOKEN)
         assert mongo_man
         assert mongo_man.active_grid == MongoManager.RESOURCES
         assert mongo_man.active_db_col == MongoManager.DOC_BLOCKS
@@ -85,10 +91,16 @@ class TestMongMan(unittest.TestCase):
         assert len(mongo_man._collections) == 4
 
     def test_full_upload(self):
-        mm = MongoManager(MONGO_URI, "TEST_2", "TEST_2_Grid")
+        mm = MongoManager(MONGO_URI, CONFLUENCE_URL, CONFLUENCE_SPACE_KEY, CONFLUENCE_UNAME, CONFLUENCE_TOKEN, "TEST_2", "TEST_2_Grid")
         export_element: List[PageElement] = mm.find_in_col(mm.active_page_col, type=PageTypes.EXPORT)
         if export_element:
             export_id = export_element[0].id
         else:
             export_id = mm.upload_one_note(TEST_DIR)
-        mm.upload_confluence(export_id, parent_title="Test Page")
+        try:
+            mm.upload_confluence(export_id, parent_title="Test Page")
+        except BaseException as e:
+            tempfile = Path("./log.temp")
+            with tempfile.open("w") as f:
+                traceback.print_exc(file=f)
+            raise e

@@ -137,8 +137,6 @@ class FromDocBlock:
         Returns:
             Tuple[str, List[str]]: Output Markdown string, list of resources needed to render page.
         """
-        if renderer is None:
-            renderer = MdRenderer()
 
         parser = cls(block_list, resource_prefix)
         token_list = []
@@ -153,8 +151,10 @@ class FromDocBlock:
         for token in token_list:
             block_state.append_token(token)
 
-        renderer = mistune.HTMLRenderer(escape=False)
-        converter = mistune.Markdown(renderer=mistune.HTMLRenderer(), plugins=[table])
+        if renderer is None:
+            renderer = mistune.HTMLRenderer(escape=False)
+
+        converter = mistune.Markdown(renderer=renderer, plugins=[table])
         converter.block.list_rules += ["table"]
         result = converter.render_state(block_state)
 
@@ -263,6 +263,7 @@ class FromDocBlock:
             "attrs": attrs,
             "bullet": block.block_attr.get("bullet"),
             "tight": block.block_attr.get("tight"),
+            "starts": block.block_attr.get("start"),
         }
 
     def _list_item(self, block: DocBlockElement) -> Dict[str, Any]:

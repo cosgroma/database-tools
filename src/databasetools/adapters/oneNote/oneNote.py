@@ -15,7 +15,7 @@ from ...models.docblock import DocBlockElementType
 from ...models.docblock import PageElement
 from ...models.docblock import PageTypes
 from ...utils.docBlock.docBlock_utils import ToDocBlock
-from ..confluence.cf_adapter import space_out_tables
+from ..confluence.cf_adapter import cf_pre_process
 
 
 class OneNoteTools:
@@ -104,7 +104,7 @@ class OneNoteTools:
             with file.open("r") as md_file:
                 metadata, raw_md = frontmatter.parse(md_file.read())
 
-            formatted_md = space_out_tables(raw_md)
+            formatted_md = cf_pre_process(raw_md)
             title = str(file.stem) if metadata.get("title") is None else str(metadata.get("title"))
             block_list, id_list = ToDocBlock.parse_md2docblock(formatted_md, mode=ToDocBlock.ONE_NOTE_MODE)
 
