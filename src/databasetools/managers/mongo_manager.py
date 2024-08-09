@@ -422,7 +422,7 @@ class MongoManager:
         content, required_resources = FromDocBlock.render_docBlock(block_list, file_block.children)
 
         try:  # Make an empty page
-            new_page = self.con_ad.make_confluence_page(file_block.name, "Under construction...", parent_id)
+            new_page = self.con_ad.make_confluence_page(file_block.name, self.CONSTRUCTION_MESSAGE, parent_id)
             new_page_name = new_page["title"]
             new_page_id = new_page["id"]
         except Exception as e:
@@ -452,6 +452,7 @@ class MongoManager:
 
     def format_final_html(self, html_from_docblock: str, page_name: str, page_id: str) -> str:
         content = cf_post_process(html_from_docblock)  # POTENTIAL FOR CATASTROPHIC BACKTRACKING: WATCH FOR CONTINUOUS PRINTOUTS.
+        # Order matters! First use cf_post_process!
 
         # Find the rest of the attachment links and parse them to a coherent format that confluence can use
         # This is the url extension to preview an attachment
@@ -579,6 +580,20 @@ class MongoManager:
 
         for item in print_list:
             logging.debug(item)
+
+    CONSTRUCTION_MESSAGE = """
+    <p>
+    <ac:emoticon ac:name="hammer and pick" ac:emoji-id="2692" />
+    <ac:emoticon ac:name="building construction" ac:emoji-id="1f3d7" />
+    <ac:emoticon ac:name="man construction worker" ac:emoji-id="1f477-200d-2642-fe0f" />
+    <ac:emoticon ac:name="construction" ac:emoji-id="1f6a7" />
+    Under Construction....
+    <ac:emoticon ac:name="hammer and wrench" ac:emoji-id="1f6e0" />
+    <ac:emoticon ac:name="hammer" ac:emoji-id="1f528" />
+    <ac:emoticon ac:name="woman construction worker" ac:emoji-id="1f477-200d-2640-fe0f" />
+    <ac:emoticon ac:name="delivery truck" ac:emoji-id="1f69a" />
+    </p>
+    """
 
 
 class IncompleteUpload(Exception):

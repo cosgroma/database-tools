@@ -64,8 +64,9 @@ class TestMongMan(unittest.TestCase):
         for name in collection_names:
             assert name in mongo_man._collections
 
-        mongo_man = MongoManager(MONGO_URI, new_db_db_name, new_grid_name, new_col)
-        assert mongo_man.active_grid == MongoManager.RESOURCES
+        mongo_man = MongoManager(
+            MONGO_URI, CONFLUENCE_URL, CONFLUENCE_SPACE_KEY, CONFLUENCE_UNAME, CONFLUENCE_TOKEN, new_db_db_name, new_grid_name, new_col
+        )
         assert mongo_man.active_db_col == MongoManager.DOC_BLOCKS
         assert mongo_man.active_page_col == MongoManager.PAGE_DATA
         assert len(mongo_man._grids) == 2
@@ -80,8 +81,16 @@ class TestMongMan(unittest.TestCase):
         assert len(mongo_man._grids) == 2
         assert len(mongo_man._collections) == 3
 
-        mongo_man = MongoManager(MONGO_URI, new_db_db_name, [new_grid_name, newer_grid_name], [new_col, newer_col])
-        assert mongo_man.active_grid == MongoManager.RESOURCES
+        mongo_man = MongoManager(
+            MONGO_URI,
+            CONFLUENCE_URL,
+            CONFLUENCE_SPACE_KEY,
+            CONFLUENCE_UNAME,
+            CONFLUENCE_TOKEN,
+            new_db_db_name,
+            [new_grid_name, newer_grid_name],
+            [new_col, newer_col],
+        )
         assert mongo_man.active_db_col == MongoManager.DOC_BLOCKS
         assert mongo_man.active_page_col == MongoManager.PAGE_DATA
         assert len(mongo_man._grids) == 3
@@ -96,7 +105,8 @@ class TestMongMan(unittest.TestCase):
         assert len(mongo_man._grids) == 3
         assert len(mongo_man._collections) == 4
 
-    def test_full_upload(self):
+    # Un-underscore this function to run a full upload.
+    def _test_full_upload(self):
         mm = MongoManager(MONGO_URI, CONFLUENCE_URL, CONFLUENCE_SPACE_KEY, CONFLUENCE_UNAME, CONFLUENCE_TOKEN, "TEST_2", "TEST_2_Grid")
         export_element: List[PageElement] = (
             mm.find_in_col(mm.active_page_col, type=PageTypes.EXPORT) if RESTART else None

@@ -3,12 +3,8 @@ import os
 import unittest
 from pathlib import Path
 
-from atlassian import Confluence
-from requests import Session
-from requests_ratelimiter import HTTPAdapter
-from urllib3.util import Retry
-
 import databasetools.adapters.confluence.cf_adapter as cf
+from databasetools.adapters.confluence.confluence import ConfluenceManager
 from databasetools.managers.mongo_manager import MongoManager
 
 MONGO_URI = os.getenv("MONGO_URI")
@@ -41,11 +37,5 @@ class TestCFAdapter(unittest.TestCase):
         mm.del_in_grid(mm.active_grid, confluence_id=id)
 
     def test_dumb_thing(self):
-        session = Session()
-        retries = Retry(total=1000, backoff_factor=0.1, status_forcelist=[502, 503, 504], allowed_methods=False)
-        session.mount("https://", HTTPAdapter(max_retries=retries))
-        self.confluence_client = Confluence(
-            url=CONFLUENCE_URL, username=CONFLUENCE_UNAME, password=CONFLUENCE_TOKEN, timeout=600, session=session
-        )
-        result = self.confluence_client.get_page_by_title(CONFLUENCE_SPACE_KEY, "2020 Holiday Schedule FAQs ")
-        print(result)
+        cm = ConfluenceManager(CONFLUENCE_URL, CONFLUENCE_SPACE_KEY, CONFLUENCE_UNAME, CONFLUENCE_TOKEN)
+        print(cm.clean_space("SERGEANT"))

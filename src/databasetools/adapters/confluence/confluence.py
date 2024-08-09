@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import List
 from typing import Optional
 from typing import Union
 
@@ -34,7 +35,7 @@ class ConfluenceManager:
 
     def get_confluence_page_id(self, title: str) -> str:
         result = self.confluence_client.get_page_by_title(self.space_key, title)
-        return result["id"]
+        return None if result is None else result["id"]
 
     def make_confluence_page(self, title: str, content: str, parent_id: str) -> dict:
         new_title = self.alias_name(title)
@@ -68,3 +69,24 @@ class ConfluenceManager:
     def add_confluence_attachments(self, resource_dir: Union[Path, str], page_id: str) -> dict:
         resource_dir = Path(resource_dir)
         return self.confluence_client.attach_file(filename=resource_dir, page_id=page_id)
+
+    def clean_space(self, protect_pages: Union[List[str], str]):
+        if isinstance(protect_pages, str):
+            protect_pages = [protect_pages]
+
+        def get_ids(page_id: str) -> List[str]:
+            id_list = [page_id]
+            child_ids = [child["id"] for child in self.confluence_client.get_child_pages(page_id)]
+
+            for child_id in child_ids:
+                id_list.extend(get_ids(child_id))
+
+            return id_list
+
+        page_ids = []
+        for page_title in protect_pages:
+            page_id = self.get_confluence_page_id(page_title)
+            page_ids.extend(get_ids(page_id))
+        # UNFINISHED
+
+        return page_ids
