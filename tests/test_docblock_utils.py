@@ -116,6 +116,7 @@ class TestDocBlock2Md(unittest.TestCase):
         block_list, id_list = ToDocBlock.parse_md2docblock(TEST_MD)
 
         convert_result, required_resources = FromDocBlock.render_docBlock(block_list, id_list)  # Testing This!
+        print(convert_result)
 
         html_convert_result = mistune.html(convert_result)
         assert html_convert_result
@@ -124,7 +125,7 @@ class TestDocBlock2Md(unittest.TestCase):
         renderer = mistune.HTMLRenderer(escape=False)
         html_result, _ = FromDocBlock.render_docBlock(block_list, id_list, renderer)
         html_answer = mistune.html(TEST_MD)
-
+        print(html_result)
         assert isinstance(html_answer, str)
         assert html_answer == html_result
         assert not required_resources
@@ -132,7 +133,7 @@ class TestDocBlock2Md(unittest.TestCase):
         block_list, id_list = ToDocBlock.parse_md2docblock(TEST_MD, ToDocBlock.ONE_NOTE_MODE)
 
         convert_result, required_resources = FromDocBlock.render_docBlock(block_list, id_list, resource_prefix="hello")  # Testing This!
-
+        print(convert_result)
         html_convert_result = mistune.html(convert_result)
         assert isinstance(html_convert_result, str)
         assert required_resources

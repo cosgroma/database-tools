@@ -1,14 +1,7 @@
 import os
-import tempfile
 import unittest
-from pathlib import Path
-
-import mistune
-from requests.exceptions import HTTPError
 
 from databasetools.adapters.confluence.confluence import ConfluenceManager
-from databasetools.models.docblock import DocBlockElement
-from databasetools.models.docblock import DocBlockElementType
 
 TEST_MD = """
 
@@ -119,53 +112,23 @@ CONFLUENCE_SPACE_KEY = os.getenv("CONFLUENCE_SPACE_KEY")
 CONFLUENCE_TOKEN = os.getenv("CONFLUENCE_API_KEY")
 MONGO_URI = os.getenv("MONGO_URI")
 
+TEST_DIR = os.getenv("TEST_DIR")
+TEST_DB_NAME = "test_db"
+TEST_DB_COL_NAME = "test_db_col"
+TEST_GRID_NAME = "test_grid"
+TEST_CON_COL_NAME = "test_confluence_col"
+
 
 class TestConfluence(unittest.TestCase):
     def setUp(self):
         # proxies = {"http": HTTP_PROXY, "https": HTTPS_PROXY} if HTTPS_PROXY and HTTPS_PROXY else None
         self.con_man = ConfluenceManager(
-            mongo_uri=MONGO_URI,
             confluence_url=CONFLUENCE_URL,
             confluence_space_key=CONFLUENCE_SPACE_KEY,
             confluence_username=CONFLUENCE_UNAME,
             confluence_api_token=CONFLUENCE_TOKEN,
-            mongo_docblock_db_name="Full_Export_Test_DB",
-            mongo_docblock_collection_name="blocks",
-            mongo_gridFS_db_name="Full_Export_Test_DB_GridFS",
         )
 
-        try:
-            self.con_man.make_confluence_page_directory("Test Page")
-        except HTTPError:
-            print("Test Page already exists")
-
-        self.main_page = self.con_man.get_confluence_page_id("Test Page")
-
-    def test_make_page(self):
-        content = mistune.html(TEST_MD)
-        self.con_man.make_confluence_page("test_md", content, self.main_page)
-
-    def test_get_mongo_page_ids(self):
-        results = self.con_man.get_mongo_page_blocks()
-        for item in results:
-            assert isinstance(item, DocBlockElement)
-            assert item.type == DocBlockElementType.PAGE
-
-    def test_upload_pages(self):
-        page_blocks = self.con_man.get_mongo_page_blocks()[0:20]
-        self.con_man.upload_pages(page_blocks)
-
-    def test_add_confluence_attachment(self):
-        temp_dir = Path(tempfile.mkdtemp())
-        test_name = "003635cb420941afacda1cf27caa921c"
-        file = self.con_man.mongo_man.fs_find_file(filename=test_name)
-        tempf_name = test_name + ".jpg"
-        tempf = Path(temp_dir / tempf_name)
-        with tempf.open("wb") as f:
-            f.write(file.read())
-
-        self.con_man.add_confluence_attachments(temp_dir, self.main_page)
-
-        for item in os.listdir(temp_dir):
-            (temp_dir / item).unlink()
-        temp_dir.rmdir()
+    def test_ty(self):
+        parent_id = self.con_man.get_confluence_page_id("Test Page")
+        self.con_man.remove_pages_from_parent(parent_id)

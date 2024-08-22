@@ -20,8 +20,8 @@ from mistune.core import BlockState
 from mistune.plugins.table import table
 from mistune.renderers.markdown import MarkdownRenderer
 
-from databasetools.models.docblock import DocBlockElement
-from databasetools.models.docblock import DocBlockElementType
+from ...models.docblock import DocBlockElement
+from ...models.docblock import DocBlockElementType
 
 DEBUG = False
 
@@ -126,7 +126,7 @@ class FromDocBlock:
         renderer: Optional[BaseRenderer] = None,
         resource_prefix: Optional[Union[Path, str]] = None,
     ) -> Tuple[str, List[str]]:
-        """Renders a list of DocBlockElement's into a formatted string.
+        """Renders a list of DocBlockElement's into a formatted string. Defaults to HTML
 
         Args:
             block_list (List[DocBlockElement]): A list of DocBlockElement's that consist of all elements in a document tree/forest.
@@ -135,10 +135,8 @@ class FromDocBlock:
             resource_prefix (Union[Path, str], optional): Prefix used before the basename of relative resource references in the URL field. Defaults to None.
 
         Returns:
-            Tuple[str, List[str]]: _description_
+            Tuple[str, List[str]]: Output Markdown string, list of resources needed to render page.
         """
-        if renderer is None:
-            renderer = MdRenderer()
 
         parser = cls(block_list, resource_prefix)
         token_list = []
@@ -153,8 +151,14 @@ class FromDocBlock:
         for token in token_list:
             block_state.append_token(token)
 
-        md_render = mistune.Markdown(renderer=renderer, plugins=[table])
-        return (md_render.render_state(block_state), parser._required_resources.copy())
+        if renderer is None:
+            renderer = mistune.HTMLRenderer(escape=False)
+
+        converter = mistune.Markdown(renderer=renderer, plugins=[table])
+        converter.block.list_rules += ["table"]
+        result = converter.render_state(block_state)
+
+        return (result, parser._required_resources)
 
     def make_token(self, block: DocBlockElement) -> Dict[str, Any]:
         b_type = block.type
@@ -259,6 +263,7 @@ class FromDocBlock:
             "attrs": attrs,
             "bullet": block.block_attr.get("bullet"),
             "tight": block.block_attr.get("tight"),
+            "starts": block.block_attr.get("start"),
         }
 
     def _list_item(self, block: DocBlockElement) -> Dict[str, Any]:

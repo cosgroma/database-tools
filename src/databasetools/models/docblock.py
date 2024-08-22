@@ -8,12 +8,9 @@ from bson import ObjectId
 from pydantic import Field
 
 from .common import Element
-from .common import Relationship
 
 
 class DocBlockElementType(str, Enum):
-    PAGE = "page"
-
     TEXT = "text"
     EMPHASIS = "emphasis"
     STRONG = "strong"
@@ -53,15 +50,23 @@ class DocBlockElement(Element):
     block_content: Optional[str] = Field(None, description="The content stored in this block")
     block_attr: Optional[Dict[str, Any]] = Field(None, description="Document block specific attributes")
     children: Optional[List[ObjectId]] = Field([], description="Ordered list of children blocks")
+    export_id: Optional[ObjectId] = Field(None, description="For pages that are from an export which get assigned an ID.")
 
 
-class BlockRelationship(Relationship):
-    """
-    Should store intra-page relationships. eg. relationships between blocks
-    """
+class PageTypes(str, Enum):
+    PAGE = "page"
+    FOLDER = "folder"
+    EXPORT = "export"
 
 
-class PageRelationship(Relationship):
-    """
-    Should store relationships between PageElement's to BlockElement's
-    """
+class PageElement(Element):
+    type: PageTypes
+    children: Optional[List[ObjectId]] = Field([], description="An ordered list of id's to children DocBlocks")
+    sub_folders: Optional[List[ObjectId]] = Field([], description="")
+    export_name: Optional[str] = Field(None, description="")
+    export_id: Optional[ObjectId] = Field(None, description="")
+    relative_path: Optional[str] = Field(None, description="")
+
+    confluence_space_key: Optional[str] = Field(None, description="The space name of the item in confluence")
+    confluence_page_name: Optional[str] = Field(None, description="The aliased name on confluence")
+    confluence_page_id: Optional[str] = Field(None, description="The page id of the confluence page")

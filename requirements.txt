@@ -18,3 +18,5 @@ pytest
 unicode
 requests-ratelimiter
 mistune
+coloredlogs
+termcolor
